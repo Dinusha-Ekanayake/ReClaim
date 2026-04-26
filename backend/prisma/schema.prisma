@@ -1,0 +1,310 @@
+// This is your Prisma schema file
+// Learn more at: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum ItemType {
+  LOST
+  FOUND
+}
+
+enum ItemStatus {
+  ACTIVE
+  MATCHED
+  CLAIM_PENDING
+  RETURNED
+  CLOSED
+  REJECTED
+}
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReportReason {
+  FAKE
+  INAPPROPRIATE
+  SPAM
+  WRONG_CATEGORY
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum NotificationType {
+  MATCH_FOUND
+  NEW_MESSAGE
+  CLAIM_SUBMITTED
+  CLAIM_APPROVED
+  CLAIM_REJECTED
+  ITEM_RETURNED
+  COMMENT_ADDED
+  SYSTEM
+}
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  password         String
+  name             String
+  avatarUrl        String?
+  phone            String?
+  showPhone        Boolean   @default(false)
+  role             Role      @default(USER)
+  isVerified       Boolean   @default(false)
+  isBanned         Boolean   @default(false)
+  banReason        String?
+  bio              String?
+  location         String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  items            Item[]
+  comments         Comment[]
+  sentMessages     Message[]         @relation("SentMessages")
+  chatParticipants ChatParticipant[]
+  claimsSubmitted  Claim[]           @relation("ClaimantUser")
+  notifications    Notification[]
+  reports          Report[]          @relation("ReporterUser")
+  reportedItems    Report[]          @relation("ReportedItemOwner")
+  refreshTokens    RefreshToken[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Item {
+  id               String     @id @default(uuid())
+  type             ItemType
+  status           ItemStatus @default(ACTIVE)
+  title            String
+  description      String
+  category         String
+  subcategory      String?
+  brand            String?
+  color            String?
+  size             String?
+
+  // Location
+  locationLabel    String     // e.g., "Near University of Colombo"
+  locationLat      Float?
+  locationLng      Float?
+  locationArea     String?    // approximate area for display
+
+  // Dates
+  dateLostFound    DateTime
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  // Owner
+  userId           String
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Images
+  images           ItemImage[]
+
+  // Verification (for found items — hidden details to verify real owner)
+  verificationHints String[]   // stored as array, not shown publicly
+
+  // Embedding for AI matching (stored as JSON array)
+  embedding        Json?
+
+  // Contact option
+  showContactInfo  Boolean    @default(false)
+
+  // Moderation
+  isApproved       Boolean    @default(true)
+  adminNote        String?
+
+  // Relations
+  comments         Comment[]
+  matchesAsLost    Match[]    @relation("LostItem")
+  matchesAsFound   Match[]    @relation("FoundItem")
+  claims           Claim[]
+  reports          Report[]
+
+  @@index([type, status])
+  @@index([userId])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model ItemImage {
+  id         String   @id @default(uuid())
+  url        String
+  publicId   String   // Cloudinary public ID for deletion
+  isPrimary  Boolean  @default(false)
+  itemId     String
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([itemId])
+}
+
+model Match {
+  id           String   @id @default(uuid())
+  lostItemId   String
+  foundItemId  String
+  score        Float    // 0-100 matching score
+  breakdown    Json     // { category: 30, keywords: 25, location: 20, date: 15, image: 10 }
+  isNotified   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  lostItem     Item     @relation("LostItem", fields: [lostItemId], references: [id], onDelete: Cascade)
+  foundItem    Item     @relation("FoundItem", fields: [foundItemId], references: [id], onDelete: Cascade)
+
+  @@unique([lostItemId, foundItemId])
+  @@index([lostItemId])
+  @@index([foundItemId])
+  @@index([score])
+}
+
+model Claim {
+  id               String      @id @default(uuid())
+  itemId           String
+  claimantId       String
+  status           ClaimStatus @default(PENDING)
+  verificationAnswers Json     // answers to hidden hints
+  message          String?     // message from claimant
+  adminNote        String?
+  reviewedAt       DateTime?
+  reviewedBy       String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  item             Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  claimant         User        @relation("ClaimantUser", fields: [claimantId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@index([claimantId])
+  @@index([status])
+}
+
+model Chat {
+  id           String            @id @default(uuid())
+  itemId       String?           // context item (optional)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  participants ChatParticipant[]
+  messages     Message[]
+}
+
+model ChatParticipant {
+  id           String   @id @default(uuid())
+  chatId       String
+  userId       String
+  lastReadAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  chat         Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  chatId    String
+  senderId  String
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id        String    @id @default(uuid())
+  itemId    String
+  userId    String
+  content   String
+  parentId  String?   // for nested replies
+  isHidden  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  item      Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+
+  @@index([itemId])
+  @@index([userId])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model Report {
+  id              String       @id @default(uuid())
+  itemId          String
+  reporterId      String
+  itemOwnerId     String
+  reason          ReportReason
+  description     String?
+  status          ReportStatus @default(PENDING)
+  adminNote       String?
+  resolvedAt      DateTime?
+  resolvedBy      String?
+  createdAt       DateTime     @default(now())
+
+  item            Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  reporter        User         @relation("ReporterUser", fields: [reporterId], references: [id])
+  itemOwner       User         @relation("ReportedItemOwner", fields: [itemOwnerId], references: [id])
+
+  @@index([itemId])
+  @@index([reporterId])
+  @@index([status])
+}
