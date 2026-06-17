@@ -65,7 +65,7 @@ export default function ImpactPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/admin/stats').then(setStats).finally(() => setLoading(false));
+    api.get('/stats').then(setStats).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const total    = stats?.items?.total    ?? 0;

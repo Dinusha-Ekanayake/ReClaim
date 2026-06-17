@@ -71,7 +71,7 @@ export function StatsSection() {
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    api.get('/admin/stats').then(setData).catch(() => {});
+    api.get('/stats').then(setData).catch(() => {});
   }, []);
 
   const stats = [
