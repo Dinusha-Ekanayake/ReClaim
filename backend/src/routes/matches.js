@@ -2,9 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const { getMatchesForItem, computeMatches } = require('../services/matchingService');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // GET /api/matches/:itemId — get matches for an item
 router.get('/:itemId', authenticate, async (req, res, next) => {

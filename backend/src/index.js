@@ -10,7 +10,7 @@ const rateLimit = require('express-rate-limit');
 
 const { initSocket } = require('./socket');
 const routes = require('./routes');
-const { errorHandler } = require('./middleware/errorHandler');
+const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
 const server = http.createServer(app);
@@ -53,7 +53,8 @@ app.get('/api/health', (req, res) => {
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api', routes);
 
-// ─── Error Handler ────────────────────────────────────────────────────────────
+// ─── 404 + Error Handler ──────────────────────────────────────────────────────
+app.use(notFound);
 app.use(errorHandler);
 
 // ─── Start ────────────────────────────────────────────────────────────────────

@@ -1,7 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { createNotification } = require('./notificationService');
-
-const prisma = new PrismaClient();
 
 // ─── Keyword Overlap Score (0-1) ──────────────────────────────────────────────
 function keywordScore(textA, textB) {
@@ -151,8 +149,15 @@ async function computeMatches(itemId) {
     });
   }
 
-  // Notify item owners of new high-confidence matches (score >= 60)
-  const highConfidence = top.filter(m => m.score >= 60 && !m.isNotified);
+  // Notify item owners of new high-confidence matches (score >= 60, not yet notified)
+  // Query DB after upsert — in-memory objects never carry isNotified from prior runs.
+  const highConfidencePairs = top.filter(m => m.score >= 60).map(m => ({
+    lostItemId: m.lostItemId, foundItemId: m.foundItemId,
+  }));
+  const highConfidence = highConfidencePairs.length > 0
+    ? await prisma.match.findMany({ where: { isNotified: false, OR: highConfidencePairs } })
+    : [];
+
   for (const match of highConfidence) {
     const lostItem = await prisma.item.findUnique({ where: { id: match.lostItemId }, select: { userId: true, title: true } });
     const foundItem = await prisma.item.findUnique({ where: { id: match.foundItemId }, select: { userId: true, title: true } });

@@ -1,127 +1,235 @@
-# ReClaim — Find what matters. Return what's lost.
+# ReClaim
 
-A smart Lost & Found platform with AI-assisted matching, real-time chat, and admin moderation.
+**Find what matters. Return what's lost.**
 
-## 🏗️ Project Structure
+ReClaim is a smart Lost & Found platform that connects people with their missing items through intelligent matching, real-time chat, and community-driven verification.
+
+---
+
+## Features
+
+- **Smart matching** — Weighted algorithm scores lost/found pairs by category, keywords, GPS proximity, date, attributes, and AI semantic embeddings
+- **Claim verification** — Found-item posters set hidden verification hints; only the true owner can answer them
+- **Real-time chat** — Socket.io-powered messaging between finders and claimants with typing indicators
+- **Multi-image upload** — Up to 5 images per item via Cloudinary CDN
+- **Interactive map** — Leaflet + OpenStreetMap for location-based browsing
+- **In-app notifications** — Instant push for matches, claims, messages, and status changes
+- **Comment threads** — Nested replies on item posts
+- **Admin panel** — Full moderation: ban users, approve/reject items, review claims and reports
+- **Dark / light mode**
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 14, React 18, Tailwind CSS, shadcn/ui (Radix UI) |
+| State | Zustand |
+| Backend | Node.js, Express 4 |
+| Database | PostgreSQL via Prisma ORM (hosted on Supabase) |
+| Auth | JWT access tokens (15 min) + refresh tokens (7 days, rotated) |
+| Real-time | Socket.io |
+| Images | Cloudinary |
+| Maps | Leaflet.js + react-leaflet + OpenStreetMap |
+| AI Matching | OpenAI `text-embedding-3-small` (optional) |
+| Deployment | Vercel + Render + Supabase |
+
+---
+
+## Project Structure
 
 ```
 reclaim/
-├── frontend/     # Next.js 14 + Tailwind CSS + shadcn/ui
-├── backend/      # Node.js + Express + Prisma
-└── docs/         # Architecture diagrams
+├── frontend/                  # Next.js 14 app
+│   ├── app/                   # App Router pages
+│   │   ├── page.tsx           # Home
+│   │   ├── items/             # Browse, detail, new, edit
+│   │   ├── search/            # Full-text + filter search
+│   │   ├── chat/              # Real-time messaging
+│   │   ├── dashboard/         # User dashboard (items, claims, notifications)
+│   │   ├── admin/             # Admin panel
+│   │   └── auth/              # Login / Register
+│   └── components/            # UI components, layout, providers
+│
+└── backend/                   # Node.js + Express API
+    ├── src/
+    │   ├── index.js           # Entry point
+    │   ├── socket.js          # Socket.io server
+    │   ├── routes/            # API route handlers
+    │   ├── controllers/       # Auth, items logic
+    │   ├── services/          # Matching, embedding, notifications, Cloudinary
+    │   ├── middleware/        # JWT auth, validation, error handling
+    │   └── lib/prisma.js      # Shared Prisma client singleton
+    └── prisma/
+        ├── schema.prisma      # Database schema
+        └── seed.js            # Seeds default admin user
 ```
 
-## 🚀 Quick Start
+---
+
+## Quick Start
 
 ### Prerequisites
-- Node.js 18+
-- PostgreSQL (or Supabase account)
-- Cloudinary account
-- (Optional) OpenAI API key for AI matching
 
-### 1. Clone & Install
+- Node.js 18+
+- PostgreSQL database (or a free [Supabase](https://supabase.com) project)
+- [Cloudinary](https://cloudinary.com) account (free tier works)
+- OpenAI API key _(optional — AI matching degrades gracefully without it)_
+
+### 1. Clone & install
 
 ```bash
 git clone https://github.com/yourusername/reclaim.git
 cd reclaim
 
-# Install backend deps
+# Backend dependencies
 cd backend && npm install
 
-# Install frontend deps
+# Frontend dependencies
 cd ../frontend && npm install
 ```
 
-### 2. Environment Variables
+### 2. Configure environment variables
 
-**Backend** — copy `backend/.env.example` to `backend/.env` and fill in:
+**`backend/.env`**
 ```env
-DATABASE_URL=postgresql://...
-JWT_SECRET=your-super-secret-key
-CLOUDINARY_CLOUD_NAME=...
-CLOUDINARY_API_KEY=...
-CLOUDINARY_API_SECRET=...
-OPENAI_API_KEY=...          # optional, for AI matching
+DATABASE_URL=postgresql://user:password@host:5432/reclaim
+JWT_SECRET=your-secret-key
+JWT_REFRESH_SECRET=your-refresh-secret-key
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+OPENAI_API_KEY=sk-...          # optional
 FRONTEND_URL=http://localhost:3000
 PORT=5000
+NODE_ENV=development
 ```
 
-**Frontend** — copy `frontend/.env.local.example` to `frontend/.env.local`:
+**`frontend/.env.local`**
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000/api
 NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
 NEXT_PUBLIC_GOOGLE_MAPS_KEY=...   # optional
 ```
 
-### 3. Database Setup
+### 3. Set up the database
 
 ```bash
 cd backend
 npx prisma migrate dev --name init
-npx prisma db seed       # seeds admin user
+npm run seed
 ```
 
-### 4. Run Development
+This creates all tables and seeds a default admin account:
+- **Email:** `admin@reclaim.app`
+- **Password:** `Admin@123`
+
+> Change these credentials immediately before going to production.
+
+### 4. Run in development
 
 ```bash
-# Terminal 1 — backend
+# Terminal 1 — backend (port 5000)
 cd backend && npm run dev
 
-# Terminal 2 — frontend
+# Terminal 2 — frontend (port 3000)
 cd frontend && npm run dev
 ```
 
-Frontend → http://localhost:3000  
-Backend API → http://localhost:5000/api  
-Admin panel → http://localhost:3000/admin  
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:5000/api |
+| Admin panel | http://localhost:3000/admin |
+| API health | http://localhost:5000/api/health |
 
-## 🔑 Default Admin Credentials (after seed)
-- Email: `admin@reclaim.app`
-- Password: `Admin@123`  
-> ⚠️ Change this immediately in production!
+---
 
-## 🌐 Deployment
+## Matching Algorithm
+
+Each lost/found pair is scored from 0–100:
+
+| Factor | Weight | Method |
+|--------|--------|--------|
+| Category | 25 | Exact match |
+| Keywords | 25 | Jaccard similarity on title + description |
+| Location | 20 | Haversine distance (GPS) or label similarity fallback |
+| Date | 15 | Exponential decay over 30 days |
+| Color + brand | 10 | Exact match per attribute |
+| AI embedding | 5 | Cosine similarity (OpenAI embeddings) |
+
+Matches are computed asynchronously after item creation. Pairs scoring ≥ 60 trigger in-app notifications to both parties.
+
+---
+
+## API Overview
+
+| Prefix | Description |
+|--------|-------------|
+| `POST /api/auth/register` | Create account |
+| `POST /api/auth/login` | Login, receive JWT pair |
+| `POST /api/auth/refresh` | Rotate refresh token |
+| `GET /api/items` | Browse items (filterable by type, category, date, location) |
+| `POST /api/items` | Post a new lost/found item |
+| `GET /api/matches/:itemId` | Get scored matches for an item |
+| `POST /api/claims` | Submit a claim for a found item |
+| `GET /api/chats` | List user's active chats |
+| `GET /api/notifications` | List notifications |
+| `POST /api/upload` | Upload images to Cloudinary |
+| `GET /api/admin/*` | Admin moderation endpoints (admin role required) |
+
+Full API reference: [`docs/API.md`](docs/API.md)
+
+---
+
+## Deployment
 
 ### Frontend → Vercel
+
 ```bash
 cd frontend
 vercel --prod
 ```
 
+Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` in the Vercel dashboard.
+
 ### Backend → Render
-1. Connect your GitHub repo on render.com
-2. Set root directory to `backend`
-3. Build command: `npm install && npx prisma migrate deploy`
-4. Start command: `npm start`
-5. Add all env variables
+
+1. Connect your GitHub repo on [render.com](https://render.com)
+2. Set **Root Directory** to `backend`
+3. **Build command:** `npm install && npx prisma migrate deploy`
+4. **Start command:** `npm start`
+5. Add all backend environment variables
 
 ### Database → Supabase
-1. Create project on supabase.com
-2. Copy the PostgreSQL connection string to `DATABASE_URL`
 
-## 📚 Tech Stack
+1. Create a project at [supabase.com](https://supabase.com)
+2. Copy the **PostgreSQL connection string** → `DATABASE_URL`
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14, React 18, Tailwind CSS, shadcn/ui |
-| Backend | Node.js, Express.js, Socket.io |
-| Database | PostgreSQL via Prisma ORM |
-| Auth | JWT (access + refresh tokens) |
-| Images | Cloudinary |
-| Maps | Leaflet.js + OpenStreetMap |
-| AI Matching | OpenAI text-embedding-3-small |
-| Real-time | Socket.io |
-| Deployment | Vercel + Render + Supabase |
+---
 
-## ✨ Features
+## Default Roles
 
-- 🔍 Smart item matching (category, keywords, location, date, AI embeddings)
-- 💬 Real-time in-app chat with message history
-- 🗺️ Location-based filtering with map view
-- 🛡️ Verification questions to prevent fake claims
-- 📸 Multi-image upload with Cloudinary
-- 🔔 In-app notifications
-- 💬 Comment sections on items
-- 👮 Admin panel with full moderation tools
-- 📊 Analytics dashboard for admins
-- 🌓 Dark/light mode
+| Role | Permissions |
+|------|------------|
+| `USER` | Post items, claim, chat, comment |
+| `ADMIN` | All of above + approve/reject items, manage claims/reports, ban users |
+| `SUPER_ADMIN` | All of above + promote users to admin |
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Commit your changes
+4. Open a pull request
+
+---
+
+## License
+
+MIT

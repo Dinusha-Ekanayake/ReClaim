@@ -1,225 +1,344 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, Menu, X, Plus, Search, MessageSquare, LogOut, User, Settings, Shield } from 'lucide-react';
+import {
+  Bell, Menu, X, Plus, Search, MessageSquare,
+  LogOut, User, Settings, Shield, ChevronDown,
+} from 'lucide-react';
 import { useAuthStore, useIsAdmin, useIsLoggedIn } from '@/lib/store/authStore';
 import { useNotificationStore } from '@/lib/store/notificationStore';
 import { cn, getAvatarFallback, timeAgo } from '@/lib/utils';
+import { LogoIcon } from '@/components/shared/Logo';
+import LanguageSelector from '@/components/shared/LanguageSelector';
+
+const NAV_LINKS = [
+  { href: '/items?type=LOST',  label: 'Lost Items',   dot: 'bg-red-500' },
+  { href: '/items?type=FOUND', label: 'Found Items',  dot: 'bg-emerald-500' },
+  { href: '/how-it-works',     label: 'How It Works', dot: null },
+];
 
 export default function Navbar() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
+  const [mobileOpen,  setMobileOpen]  = useState(false);
+  const [notifOpen,   setNotifOpen]   = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [scrolled,    setScrolled]    = useState(false);
+  const notifRef   = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
 
-  const router = useRouter();
+  const router   = useRouter();
   const pathname = usePathname();
-  const user = useAuthStore(s => s.user);
-  const logout = useAuthStore(s => s.logout);
+  const user     = useAuthStore(s => s.user);
+  const logout   = useAuthStore(s => s.logout);
   const isLoggedIn = useIsLoggedIn();
-  const isAdmin = useIsAdmin();
+  const isAdmin    = useIsAdmin();
   const { notifications, unreadCount, fetch: fetchNotifs, markRead, markAllRead } = useNotificationStore();
 
+  // Scroll shadow
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', onScroll);
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Fetch notifications
   useEffect(() => {
     if (isLoggedIn) fetchNotifs();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, fetchNotifs]);
+
+  // Close mobile menu on route change
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+
+  // Click-outside to close dropdowns
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const handleLogout = async () => {
+    setProfileOpen(false);
     await logout();
     router.push('/');
   };
 
-  const navLinks = [
-    { href: '/items?type=LOST', label: 'Lost Items' },
-    { href: '/items?type=FOUND', label: 'Found Items' },
-    { href: '/how-it-works', label: 'How It Works' },
-  ];
-
   return (
-    <nav className={cn(
-      'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
-      scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-white'
-    )}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-            <Image src="/logo.png" alt="ReClaim" width={36} height={36} className="rounded-lg" />
-            <span className="font-display font-bold text-xl text-gray-900">
-              Re<span className="text-primary-600">Claim</span>
-            </span>
-          </Link>
+    <>
+      <nav className={cn(
+        'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
+        scrolled
+          ? 'bg-white/95 backdrop-blur-lg shadow-sm shadow-gray-200/80 border-b border-gray-100/80'
+          : 'bg-white border-b border-transparent'
+      )}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-20">
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-6">
-            {navLinks.map(link => (
-              <Link key={link.href} href={link.href}
-                className={cn(
-                  'text-sm font-medium transition-colors',
-                  pathname === link.href ? 'text-primary-600' : 'text-gray-600 hover:text-gray-900'
-                )}>
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            <Link href="/search" className="p-2 text-gray-500 hover:text-gray-900 transition-colors">
-              <Search size={20} />
+            {/* ── Logo ─────────────────────────────────────────── */}
+            <Link href="/" className="flex items-center gap-3 flex-shrink-0 group">
+              <LogoIcon size="md" className="group-hover:scale-105 transition-transform duration-200" />
+              <span className="font-display font-extrabold text-2xl text-gray-900 tracking-tight">
+                Re<span className="text-primary-600">Claim</span>
+              </span>
             </Link>
 
-            {isLoggedIn ? (
-              <>
-                {/* Post Item CTA */}
-                <Link href="/items/new"
-                  className="hidden sm:flex items-center gap-1.5 btn-primary text-sm py-2 px-4">
-                  <Plus size={16} />
-                  <span>Post Item</span>
-                </Link>
+            {/* ── Desktop nav links ─────────────────────────────── */}
+            <div className="hidden md:flex items-center gap-1">
+              {NAV_LINKS.map(link => {
+                const isActive = pathname === link.href || (link.href.includes('?') && pathname.includes(link.href.split('?')[0]));
+                return (
+                  <Link key={link.href} href={link.href}
+                    className={cn(
+                      'relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[15px] font-medium transition-all duration-200',
+                      isActive
+                        ? 'text-primary-600 bg-primary-50'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    )}>
+                    {link.dot && <span className={`w-2 h-2 rounded-full ${link.dot}`} />}
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
 
-                {/* Chat */}
-                <Link href="/chat" className="p-2 text-gray-500 hover:text-gray-900 relative">
-                  <MessageSquare size={20} />
-                </Link>
+            {/* ── Right actions ─────────────────────────────────── */}
+            <div className="flex items-center gap-1">
 
-                {/* Notifications */}
-                <div className="relative">
-                  <button onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }}
-                    className="p-2 text-gray-500 hover:text-gray-900 relative">
-                    <Bell size={20} />
-                    {unreadCount > 0 && (
-                      <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </span>
-                    )}
-                  </button>
+              {/* Search */}
+              <Link href="/search"
+                className="p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100
+                           rounded-xl transition-all duration-200">
+                <Search size={20} />
+              </Link>
 
-                  {notifOpen && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
-                      <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-20 overflow-hidden animate-fade-in">
-                        <div className="flex items-center justify-between px-4 py-3 border-b">
-                          <h3 className="font-semibold text-gray-900">Notifications</h3>
+              {/* Language */}
+              <LanguageSelector />
+
+              {isLoggedIn ? (
+                <>
+                  {/* Post Item */}
+                  <Link href="/items/new"
+                    className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-xl
+                               bg-primary-600 text-white text-sm font-semibold
+                               hover:bg-primary-700 active:scale-95
+                               transition-all duration-200 shadow-sm hover:shadow-md ml-1">
+                    <Plus size={15} strokeWidth={2.5} />
+                    Post Item
+                  </Link>
+
+                  {/* Chat */}
+                  <Link href="/chat"
+                    className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100
+                               rounded-lg transition-all duration-200 relative">
+                    <MessageSquare size={19} />
+                  </Link>
+
+                  {/* Notifications */}
+                  <div className="relative" ref={notifRef}>
+                    <button
+                      onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }}
+                      className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100
+                                 rounded-lg transition-all duration-200 relative">
+                      <Bell size={19} />
+                      {unreadCount > 0 && (
+                        <span className="absolute top-1.5 right-1.5 w-4 h-4
+                                         bg-red-500 text-white text-[10px] font-bold
+                                         rounded-full flex items-center justify-center
+                                         animate-pulse-ring">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      )}
+                    </button>
+
+                    {notifOpen && (
+                      <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl
+                                      shadow-xl shadow-gray-200/70 border border-gray-100
+                                      z-50 overflow-hidden animate-fade-in">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+                          <h3 className="font-semibold text-sm text-gray-900">Notifications</h3>
                           {unreadCount > 0 && (
-                            <button onClick={markAllRead} className="text-xs text-primary-600 hover:underline">
+                            <button onClick={markAllRead}
+                              className="text-xs text-primary-600 hover:text-primary-700 font-medium">
                               Mark all read
                             </button>
                           )}
                         </div>
                         <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
                           {notifications.length === 0 ? (
-                            <p className="text-center text-gray-400 text-sm py-8">No notifications yet</p>
+                            <div className="flex flex-col items-center justify-center py-10 text-center">
+                              <Bell size={28} className="text-gray-200 mb-2" />
+                              <p className="text-sm text-gray-400">No notifications yet</p>
+                            </div>
                           ) : notifications.slice(0, 10).map(n => (
-                            <button key={n.id} onClick={() => {
-                              markRead(n.id);
-                              if (n.link) router.push(n.link);
-                              setNotifOpen(false);
-                            }}
-                              className={cn('w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors',
-                                !n.isRead && 'bg-blue-50/50')}>
-                              <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>
-                              <p className="text-xs text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
+                            <button key={n.id}
+                              onClick={() => { markRead(n.id); if (n.link) router.push(n.link); setNotifOpen(false); }}
+                              className={cn(
+                                'w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors',
+                                !n.isRead && 'bg-blue-50/60 border-l-2 border-primary-400'
+                              )}>
+                              <p className="text-sm font-semibold text-gray-900 leading-snug">{n.title}</p>
+                              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
+                              <p className="text-[11px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
                             </button>
                           ))}
                         </div>
                         <Link href="/dashboard/notifications"
-                          className="block text-center text-xs text-primary-600 py-3 border-t hover:bg-gray-50">
-                          View all notifications
+                          className="block text-center text-xs text-primary-600 font-medium
+                                     py-3 border-t border-gray-50 hover:bg-gray-50 transition-colors">
+                          View all notifications →
                         </Link>
                       </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Profile */}
-                <div className="relative">
-                  <button onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }}
-                    className="flex items-center gap-2 p-1 rounded-full hover:bg-gray-100 transition-colors">
-                    {user?.avatarUrl ? (
-                      <Image src={user.avatarUrl} alt={user.name} width={32} height={32}
-                        className="rounded-full object-cover" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">
-                        {getAvatarFallback(user?.name || 'U')}
-                      </div>
                     )}
-                  </button>
+                  </div>
 
-                  {profileOpen && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} />
-                      <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 z-20 overflow-hidden animate-fade-in">
-                        <div className="px-4 py-3 border-b">
-                          <p className="font-semibold text-sm text-gray-900">{user?.name}</p>
+                  {/* Profile dropdown */}
+                  <div className="relative" ref={profileRef}>
+                    <button
+                      onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }}
+                      className="flex items-center gap-1.5 pl-1.5 pr-2 py-1
+                                 rounded-xl hover:bg-gray-100 transition-all duration-200">
+                      {user?.avatarUrl ? (
+                        <Image src={user.avatarUrl} alt={user.name}
+                          width={32} height={32}
+                          className="rounded-full object-cover ring-2 ring-white" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700
+                                        text-white text-xs font-bold flex items-center justify-center
+                                        ring-2 ring-white shadow-sm">
+                          {getAvatarFallback(user?.name ?? 'U')}
+                        </div>
+                      )}
+                      <ChevronDown size={14} className={cn(
+                        'text-gray-400 transition-transform duration-200',
+                        profileOpen && 'rotate-180'
+                      )} />
+                    </button>
+
+                    {profileOpen && (
+                      <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl
+                                      shadow-xl shadow-gray-200/70 border border-gray-100
+                                      z-50 overflow-hidden animate-fade-in">
+                        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                          <p className="font-semibold text-sm text-gray-900 truncate">{user?.name}</p>
                           <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                         </div>
-                        <div className="py-1">
-                          <Link href="/dashboard" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <User size={16} /> My Dashboard
-                          </Link>
-                          <Link href="/dashboard/settings" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <Settings size={16} /> Settings
-                          </Link>
+                        <div className="py-1.5">
+                          {[
+                            { href: '/dashboard',           icon: <User size={15} />,     label: 'My Dashboard' },
+                            { href: '/dashboard/settings',  icon: <Settings size={15} />, label: 'Settings' },
+                          ].map(item => (
+                            <Link key={item.href} href={item.href}
+                              onClick={() => setProfileOpen(false)}
+                              className="flex items-center gap-2.5 px-4 py-2.5 text-sm
+                                         text-gray-700 hover:bg-gray-50 transition-colors">
+                              <span className="text-gray-400">{item.icon}</span>
+                              {item.label}
+                            </Link>
+                          ))}
                           {isAdmin && (
-                            <Link href="/admin" className="flex items-center gap-2 px-4 py-2 text-sm text-primary-600 hover:bg-blue-50 font-medium">
-                              <Shield size={16} /> Admin Panel
+                            <Link href="/admin"
+                              onClick={() => setProfileOpen(false)}
+                              className="flex items-center gap-2.5 px-4 py-2.5 text-sm
+                                         text-primary-600 font-medium hover:bg-blue-50 transition-colors">
+                              <Shield size={15} /> Admin Panel
                             </Link>
                           )}
+                          <div className="mx-3 my-1 border-t border-gray-100" />
                           <button onClick={handleLogout}
-                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50">
-                            <LogOut size={16} /> Sign Out
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm
+                                       text-red-600 hover:bg-red-50 transition-colors">
+                            <LogOut size={15} /> Sign Out
                           </button>
                         </div>
                       </div>
-                    </>
-                  )}
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 ml-1">
+                  <Link href="/auth/login"
+                    className="hidden sm:block text-sm font-medium text-gray-600
+                               hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-50
+                               transition-all duration-200">
+                    Sign In
+                  </Link>
+                  <Link href="/auth/register"
+                    className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-semibold
+                               hover:bg-primary-700 active:scale-95
+                               transition-all duration-200 shadow-sm hover:shadow-md">
+                    Sign Up
+                  </Link>
                 </div>
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Link href="/auth/login" className="btn-outline text-sm py-2 px-4 hidden sm:block">Sign In</Link>
-                <Link href="/auth/register" className="btn-primary text-sm py-2 px-4">Sign Up</Link>
-              </div>
-            )}
+              )}
 
-            {/* Mobile menu toggle */}
-            <button className="md:hidden p-2 text-gray-500" onClick={() => setMobileOpen(!mobileOpen)}>
-              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
+              {/* Mobile menu toggle */}
+              <button
+                className="md:hidden p-2 ml-1 text-gray-500 hover:text-gray-900
+                           hover:bg-gray-100 rounded-lg transition-all duration-200"
+                onClick={() => setMobileOpen(!mobileOpen)}>
+                {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Mobile Menu */}
-      {mobileOpen && (
-        <div className="md:hidden bg-white border-t border-gray-100 animate-fade-in">
-          <div className="px-4 py-4 space-y-1">
-            {navLinks.map(link => (
-              <Link key={link.href} href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg">
-                {link.label}
-              </Link>
-            ))}
-            {isLoggedIn && (
-              <Link href="/items/new" onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary-600 hover:bg-blue-50 rounded-lg">
-                <Plus size={16} /> Post an Item
-              </Link>
-            )}
+        {/* ── Mobile menu ─────────────────────────────────────── */}
+        {mobileOpen && (
+          <div className="md:hidden bg-white border-t border-gray-100 animate-slide-in-down">
+            <div className="px-4 py-3 space-y-1">
+              {NAV_LINKS.map(link => (
+                <Link key={link.href} href={link.href}
+                  className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium
+                             text-gray-700 hover:bg-gray-50 rounded-xl transition-colors">
+                  {link.dot && <span className={`w-2 h-2 rounded-full ${link.dot}`} />}
+                  {link.label}
+                </Link>
+              ))}
+
+              {isLoggedIn ? (
+                <>
+                  <div className="my-2 border-t border-gray-100" />
+                  <Link href="/items/new"
+                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold
+                               text-primary-600 hover:bg-blue-50 rounded-xl transition-colors">
+                    <Plus size={16} strokeWidth={2.5} /> Post an Item
+                  </Link>
+                  <Link href="/chat"
+                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium
+                               text-gray-700 hover:bg-gray-50 rounded-xl transition-colors">
+                    <MessageSquare size={16} /> Messages
+                  </Link>
+                  <Link href="/dashboard"
+                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium
+                               text-gray-700 hover:bg-gray-50 rounded-xl transition-colors">
+                    <User size={16} /> My Dashboard
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <div className="my-2 border-t border-gray-100" />
+                  <Link href="/auth/login"
+                    className="block px-3 py-2.5 text-sm font-medium
+                               text-gray-700 hover:bg-gray-50 rounded-xl transition-colors">
+                    Sign In
+                  </Link>
+                  <Link href="/auth/register"
+                    className="block px-3 py-2.5 text-sm font-semibold
+                               text-primary-600 hover:bg-blue-50 rounded-xl transition-colors">
+                    Create Account
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    </nav>
+        )}
+      </nav>
+
+      {/* Spacer so content doesn't hide under fixed nav */}
+      <div className="h-20" />
+    </>
   );
 }
