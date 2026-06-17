@@ -52,34 +52,34 @@ export default function FaqPage() {
     <PublicLayout>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-14">
-          <p className="text-sm font-semibold text-primary-600 mb-3">Help Centre</p>
-          <h1 className="text-4xl font-display font-extrabold text-gray-900 mb-4">Frequently Asked Questions</h1>
-          <p className="text-gray-500">Can't find your answer? <Link href="/contact" className="text-primary-600 hover:underline font-medium">Contact us</Link></p>
+          <p className="text-sm font-semibold text-primary-600 dark:text-primary-400 mb-3">Help Centre</p>
+          <h1 className="text-4xl font-display font-extrabold text-gray-900 dark:text-white mb-4">Frequently Asked Questions</h1>
+          <p className="text-gray-500 dark:text-gray-400">Can't find your answer? <Link href="/contact" className="text-primary-600 dark:text-primary-400 hover:underline font-medium">Contact us</Link></p>
         </div>
 
         <div className="space-y-4">
           {FAQS.map((faq, i) => (
             <details key={i}
-              className="group bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden
-                         hover:border-gray-200 transition-colors">
+              className="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden
+                         hover:border-gray-200 dark:hover:border-gray-700 transition-colors">
               <summary className="flex items-center justify-between gap-4 px-6 py-5 cursor-pointer
-                                  font-semibold text-gray-900 list-none select-none">
+                                  font-semibold text-gray-900 dark:text-white list-none select-none">
                 {faq.q}
-                <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0
-                                  text-gray-500 group-open:rotate-45 transition-transform duration-200 text-lg font-light">
+                <span className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0
+                                  text-gray-500 dark:text-gray-400 group-open:rotate-45 transition-transform duration-200 text-lg font-light">
                   +
                 </span>
               </summary>
-              <div className="px-6 pb-5 text-gray-600 text-sm leading-relaxed border-t border-gray-50 pt-4">
+              <div className="px-6 pb-5 text-gray-600 dark:text-gray-300 text-sm leading-relaxed border-t border-gray-50 dark:border-gray-800 pt-4">
                 {faq.a}
               </div>
             </details>
           ))}
         </div>
 
-        <div className="mt-14 text-center p-8 bg-primary-50 rounded-2xl border border-primary-100">
-          <h3 className="font-display font-bold text-gray-900 mb-2">Still have questions?</h3>
-          <p className="text-gray-500 text-sm mb-5">Our team is happy to help you.</p>
+        <div className="mt-14 text-center p-8 bg-primary-50 dark:bg-primary-500/10 rounded-2xl border border-primary-100 dark:border-primary-500/20">
+          <h3 className="font-display font-bold text-gray-900 dark:text-white mb-2">Still have questions?</h3>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-5">Our team is happy to help you.</p>
           <Link href="/contact" className="btn-primary inline-flex">Get in touch</Link>
         </div>
       </div>

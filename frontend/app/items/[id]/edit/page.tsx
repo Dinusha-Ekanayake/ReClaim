@@ -72,29 +72,29 @@ export default function EditItemPage() {
     <PublicLayout>
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
         <button onClick={() => router.back()}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors">
+          className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-6 transition-colors">
           <ArrowLeft size={16} /> Back
         </button>
 
-        <h1 className="text-3xl font-display font-bold text-gray-900 mb-2">Edit Item</h1>
-        <p className="text-gray-500 mb-8 text-sm">Update your listing details</p>
+        <h1 className="text-3xl font-display font-bold text-gray-900 dark:text-white mb-2">Edit Item</h1>
+        <p className="text-gray-500 dark:text-gray-400 mb-8 text-sm">Update your listing details</p>
 
-        <div className="card p-8 space-y-6">
+        <div className="card p-5 sm:p-8 space-y-6">
           {/* Title */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Title *</label>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Title *</label>
             <input type="text" value={form.title} onChange={e => set('title', e.target.value)}
               className="input-field" maxLength={100} />
           </div>
 
           {/* Category */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Category *</label>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Category *</label>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {CATEGORIES.map(cat => (
                 <button key={cat.value} type="button" onClick={() => set('category', cat.value)}
                   className={`p-3 rounded-xl border text-center text-xs font-medium transition-all
-                    ${form.category === cat.value ? 'border-primary-500 bg-blue-50 text-primary-700' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                    ${form.category === cat.value ? 'border-primary-500 bg-blue-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 text-gray-600 dark:text-gray-300'}`}>
                   <div className="text-xl mb-1">{cat.icon}</div>{cat.label}
                 </button>
               ))}
@@ -103,7 +103,7 @@ export default function EditItemPage() {
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Description *</label>
             <textarea value={form.description} onChange={e => set('description', e.target.value)}
               rows={5} className="input-field resize-none" />
           </div>
@@ -111,14 +111,14 @@ export default function EditItemPage() {
           {/* Color + Brand */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Color</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Color</label>
               <select value={form.color} onChange={e => set('color', e.target.value)} className="input-field">
                 <option value="">Select color</option>
                 {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Brand</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Brand</label>
               <input type="text" value={form.brand} onChange={e => set('brand', e.target.value)}
                 placeholder="e.g. Apple, Nike" className="input-field" />
             </div>
@@ -127,35 +127,35 @@ export default function EditItemPage() {
           {/* Location + Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Location *</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Location *</label>
               <input type="text" value={form.locationLabel} onChange={e => set('locationLabel', e.target.value)}
                 className="input-field" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Date Lost/Found *</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Date Lost/Found *</label>
               <input type="date" value={form.dateLostFound} onChange={e => set('dateLostFound', e.target.value)}
                 max={new Date().toISOString().split('T')[0]} className="input-field" />
             </div>
           </div>
 
           {/* Show contact */}
-          <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
+          <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
             <input type="checkbox" id="showContact" checked={form.showContactInfo}
               onChange={e => set('showContactInfo', e.target.checked)}
               className="w-4 h-4 text-primary-600 rounded" />
-            <label htmlFor="showContact" className="text-sm text-gray-700">
+            <label htmlFor="showContact" className="text-sm text-gray-700 dark:text-gray-300">
               Show my phone number publicly on this listing
             </label>
           </div>
 
           {/* Feedback */}
           {error && (
-            <div className="flex items-center gap-2 p-4 bg-red-50 text-red-700 rounded-xl text-sm">
+            <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 rounded-xl text-sm">
               <AlertCircle size={16} /> {error}
             </div>
           )}
           {success && (
-            <div className="flex items-center gap-2 p-4 bg-green-50 text-green-700 rounded-xl text-sm">
+            <div className="flex items-center gap-2 p-4 bg-green-50 dark:bg-emerald-500/10 text-green-700 dark:text-emerald-400 rounded-xl text-sm">
               <CheckCircle size={16} /> Saved! Redirecting…
             </div>
           )}

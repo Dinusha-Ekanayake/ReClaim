@@ -18,7 +18,7 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="bg-gray-900 rounded-2xl p-5 h-32 skeleton" />
@@ -65,7 +65,7 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-display font-bold text-white mb-1">Admin Dashboard</h1>

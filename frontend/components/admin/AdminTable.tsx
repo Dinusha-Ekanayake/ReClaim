@@ -21,7 +21,8 @@ export function AdminTable({
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-      <table className="w-full">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px]">
         <thead>
           <tr className="border-b border-gray-800">
             {headers.map(h => (
@@ -46,6 +47,7 @@ export function AdminTable({
           ) : isEmpty ? null : children}
         </tbody>
       </table>
+      </div>
 
       {!loading && isEmpty && (
         <div className="text-center py-14 text-gray-500 text-sm">{emptyMessage}</div>

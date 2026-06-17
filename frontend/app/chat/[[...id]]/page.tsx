@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { motion } from 'framer-motion';
 import { Send, ArrowLeft, Circle } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import api from '@/lib/api';
@@ -90,20 +91,20 @@ export default function ChatPage() {
   const otherUser = chat ? getOtherParticipant(chat) : null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-500">
       <Navbar />
-      <div className="pt-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex gap-6 h-[calc(100vh-120px)]">
+      <div className="pt-16 max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-0 sm:py-6">
+        <div className="flex gap-0 sm:gap-6 h-[calc(100dvh-64px)] sm:h-[calc(100vh-120px)]">
           {/* Sidebar - Chat List */}
-          <div className={cn('w-80 flex-shrink-0 card flex flex-col', id !== 'index' && 'hidden lg:flex')}>
-            <div className="p-4 border-b">
-              <h2 className="font-display font-bold text-gray-900">Messages</h2>
+          <div className={cn('w-full lg:w-80 flex-shrink-0 card rounded-none sm:rounded-2xl flex flex-col', id !== 'index' && 'hidden lg:flex')}>
+            <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+              <h2 className="font-display font-bold text-gray-900 dark:text-white">Messages</h2>
             </div>
             <div className="flex-1 overflow-y-auto">
               {chats.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-6">
                   <div className="text-4xl mb-3">💬</div>
-                  <p className="text-sm text-gray-500">No conversations yet</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No conversations yet</p>
                 </div>
               ) : (
                 chats.map(c => {
@@ -112,13 +113,13 @@ export default function ChatPage() {
                   const unread = c._count?.messages || 0;
                   return (
                     <button key={c.id} onClick={() => router.push(`/chat/${c.id}`)}
-                      className={cn('w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50',
-                        id === c.id && 'bg-blue-50')}>
+                      className={cn('w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left border-b border-gray-50 dark:border-gray-800',
+                        id === c.id && 'bg-blue-50 dark:bg-primary-500/10')}>
                       <div className="relative flex-shrink-0">
                         {other?.avatarUrl ? (
                           <Image src={other.avatarUrl} alt={other.name} width={40} height={40} className="rounded-full" />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 text-sm font-bold flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 text-sm font-bold flex items-center justify-center">
                             {getAvatarFallback(other?.name || 'U')}
                           </div>
                         )}
@@ -129,12 +130,12 @@ export default function ChatPage() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{other?.name || 'User'}</p>
-                        <p className="text-xs text-gray-400 truncate">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{other?.name || 'User'}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
                           {lastMsg ? lastMsg.content : 'No messages yet'}
                         </p>
                       </div>
-                      <span className="text-xs text-gray-300 flex-shrink-0">
+                      <span className="text-xs text-gray-300 dark:text-gray-600 flex-shrink-0">
                         {lastMsg ? timeAgo(lastMsg.createdAt) : ''}
                       </span>
                     </button>
@@ -148,58 +149,61 @@ export default function ChatPage() {
           {!id || id === 'index' ? (
             <div className="hidden lg:flex flex-1 card items-center justify-center">
               <div className="text-center">
-                <div className="text-5xl mb-4">💬</div>
-                <p className="text-gray-500 font-medium">Select a conversation</p>
-                <p className="text-sm text-gray-400">Start chatting by messaging an item poster</p>
+                <div className="text-5xl mb-4 animate-float">💬</div>
+                <p className="text-gray-500 dark:text-gray-300 font-medium">Select a conversation</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">Start chatting by messaging an item poster</p>
               </div>
             </div>
           ) : (
-            <div className="flex-1 card flex flex-col min-w-0">
+            <div className="flex-1 card rounded-none sm:rounded-2xl flex flex-col min-w-0">
               {/* Chat header */}
-              <div className="flex items-center gap-3 p-4 border-b">
-                <button onClick={() => router.push('/chat')} className="lg:hidden p-1 hover:bg-gray-100 rounded-lg">
+              <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-800">
+                <button onClick={() => router.push('/chat')} className="lg:hidden p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300">
                   <ArrowLeft size={20} />
                 </button>
                 {otherUser?.avatarUrl ? (
                   <Image src={otherUser.avatarUrl} alt={otherUser.name} width={36} height={36} className="rounded-full" />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-700 text-sm font-bold flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 text-sm font-bold flex items-center justify-center">
                     {getAvatarFallback(otherUser?.name || 'U')}
                   </div>
                 )}
                 <div>
-                  <p className="font-semibold text-gray-900 text-sm">{otherUser?.name}</p>
-                  {isTyping && <p className="text-xs text-secondary-500">typing…</p>}
+                  <p className="font-semibold text-gray-900 dark:text-white text-sm">{otherUser?.name}</p>
+                  {isTyping && <p className="text-xs text-secondary-500 dark:text-emerald-400">typing…</p>}
                 </div>
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50 dark:bg-gray-950/50">
                 {loading ? (
-                  <div className="flex items-center justify-center h-full text-gray-400">Loading…</div>
+                  <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">Loading…</div>
                 ) : messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center">
                     <div className="text-4xl mb-3">👋</div>
-                    <p className="text-sm text-gray-500">Start the conversation!</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Start the conversation!</p>
                   </div>
                 ) : (
                   messages.map(msg => {
                     const isMe = msg.senderId === user?.id || msg.sender?.id === user?.id;
                     return (
-                      <div key={msg.id} className={cn('flex gap-2', isMe ? 'flex-row-reverse' : 'flex-row')}>
+                      <motion.div key={msg.id}
+                        initial={{ opacity: 0, y: 10, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                        className={cn('flex gap-2', isMe ? 'flex-row-reverse' : 'flex-row')}>
                         {!isMe && (
-                          <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-auto">
+                          <div className="w-7 h-7 rounded-full bg-primary-100 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-auto">
                             {getAvatarFallback(msg.sender?.name || 'U')}
                           </div>
                         )}
                         <div className={cn('max-w-xs lg:max-w-md', isMe ? 'items-end' : 'items-start')}>
-                          <div className={cn('px-4 py-2.5 rounded-2xl text-sm',
-                            isMe ? 'bg-primary-600 text-white rounded-br-sm' : 'bg-gray-100 text-gray-900 rounded-bl-sm')}>
+                          <div className={cn('px-4 py-2.5 rounded-2xl text-sm shadow-sm',
+                            isMe ? 'bg-primary-600 text-white rounded-br-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-sm')}>
                             {msg.content}
                           </div>
-                          <p className="text-xs text-gray-400 mt-1 px-1">{timeAgo(msg.createdAt)}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 px-1">{timeAgo(msg.createdAt)}</p>
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })
                 )}
@@ -207,7 +211,7 @@ export default function ChatPage() {
               </div>
 
               {/* Input */}
-              <div className="p-4 border-t">
+              <div className="p-4 border-t border-gray-100 dark:border-gray-800">
                 <div className="flex gap-3">
                   <input type="text" value={text} onChange={e => { setText(e.target.value); handleTyping(); }}
                     onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}

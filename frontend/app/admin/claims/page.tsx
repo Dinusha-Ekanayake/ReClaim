@@ -47,7 +47,7 @@ export default function AdminClaimsPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-display font-bold text-white mb-1">Claims Management</h1>
         <p className="text-gray-400 text-sm">{total} {status ? status.toLowerCase() : 'total'} claims</p>

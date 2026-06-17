@@ -58,14 +58,14 @@ export default function CommentSection({ itemId }: CommentSectionProps) {
 
   return (
     <div className="card p-6">
-      <h3 className="font-display font-semibold text-gray-900 mb-5">
+      <h3 className="font-display font-semibold text-gray-900 dark:text-white mb-5">
         Comments ({comments.length})
       </h3>
 
       {/* Input */}
       {isLoggedIn ? (
         <div className="flex gap-3 mb-6">
-          <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 text-xs font-bold flex items-center justify-center flex-shrink-0">
             {getAvatarFallback(user?.name || 'U')}
           </div>
           <div className="flex-1 flex gap-2">
@@ -80,15 +80,15 @@ export default function CommentSection({ itemId }: CommentSectionProps) {
           </div>
         </div>
       ) : (
-        <p className="text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl text-center">
-          <Link href="/auth/login" className="text-primary-600 hover:underline font-medium">Sign in</Link> to comment
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 bg-gray-50 dark:bg-gray-800 p-4 rounded-xl text-center">
+          <Link href="/auth/login" className="text-primary-600 dark:text-primary-400 hover:underline font-medium">Sign in</Link> to comment
         </p>
       )}
 
       {/* Comments list */}
       <div className="space-y-5">
         {comments.length === 0 && (
-          <p className="text-center text-sm text-gray-400 py-4">No comments yet. Be the first!</p>
+          <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-4">No comments yet. Be the first!</p>
         )}
         {comments.map(comment => (
           <div key={comment.id}>
@@ -135,19 +135,19 @@ function CommentItem({ comment, currentUserId, onReply, onDelete, isReply = fals
         <Image src={comment.user.avatarUrl} alt={comment.user.name} width={32} height={32}
           className="rounded-full flex-shrink-0" />
       ) : (
-        <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 text-xs font-bold flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-bold flex items-center justify-center flex-shrink-0">
           {getAvatarFallback(comment.user?.name || 'U')}
         </div>
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
-          <span className="text-sm font-semibold text-gray-900">{comment.user?.name}</span>
-          <span className="text-xs text-gray-400">{timeAgo(comment.createdAt)}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-white">{comment.user?.name}</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">{timeAgo(comment.createdAt)}</span>
         </div>
-        <p className="text-sm text-gray-700 leading-relaxed">{comment.content}</p>
+        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{comment.content}</p>
         <div className="flex items-center gap-3 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {onReply && (
-            <button onClick={onReply} className="text-xs text-gray-400 hover:text-primary-600 transition-colors">
+            <button onClick={onReply} className="text-xs text-gray-400 dark:text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
               Reply
             </button>
           )}

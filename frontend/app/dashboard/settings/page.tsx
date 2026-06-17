@@ -56,13 +56,13 @@ export default function SettingsPage() {
   return (
     <div className="max-w-xl space-y-8">
       <div>
-        <h1 className="text-2xl font-display font-bold text-gray-900 mb-1">Account Settings</h1>
-        <p className="text-gray-500 text-sm">Manage your profile and preferences</p>
+        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white mb-1">Account Settings</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">Manage your profile and preferences</p>
       </div>
 
       {/* Avatar */}
       <div className="card p-6">
-        <h2 className="font-semibold text-gray-900 mb-4">Profile Photo</h2>
+        <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Profile Photo</h2>
         <div className="flex items-center gap-5">
           <div className="relative">
             {user?.avatarUrl ? (
@@ -83,33 +83,33 @@ export default function SettingsPage() {
             </label>
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
-            <p className="text-xs text-gray-500">{user?.email}</p>
-            <p className="text-xs text-gray-400 mt-1">JPG, PNG or WebP. Max 5MB.</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">{user?.name}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">JPG, PNG or WebP. Max 5MB.</p>
           </div>
         </div>
       </div>
 
       {/* Profile Info */}
       <div className="card p-6 space-y-5">
-        <h2 className="font-semibold text-gray-900">Profile Information</h2>
+        <h2 className="font-semibold text-gray-900 dark:text-white">Profile Information</h2>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
           <input type="text" value={form.name} onChange={e => update('name', e.target.value)}
             className="input-field" maxLength={50} />
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Bio</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Bio</label>
           <textarea value={form.bio} onChange={e => update('bio', e.target.value)}
             rows={3} placeholder="Tell others a bit about yourself..."
             className="input-field resize-none" maxLength={300} />
-          <p className="text-xs text-gray-400 mt-1">{form.bio.length}/300</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{form.bio.length}/300</p>
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Location</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Location</label>
           <input type="text" value={form.location} onChange={e => update('location', e.target.value)}
             placeholder="e.g. Colombo, Sri Lanka" className="input-field" />
         </div>
@@ -117,21 +117,21 @@ export default function SettingsPage() {
 
       {/* Contact */}
       <div className="card p-6 space-y-5">
-        <h2 className="font-semibold text-gray-900">Contact & Privacy</h2>
+        <h2 className="font-semibold text-gray-900 dark:text-white">Contact & Privacy</h2>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Phone Number</label>
           <input type="tel" value={form.phone} onChange={e => update('phone', e.target.value)}
             placeholder="+94 77 000 0000" className="input-field" />
         </div>
 
-        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
           <div>
-            <p className="text-sm font-semibold text-gray-900">Show phone on listings</p>
-            <p className="text-xs text-gray-500">Allow others to call you directly from your item pages</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Show phone on listings</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Allow others to call you directly from your item pages</p>
           </div>
           <button onClick={() => update('showPhone', !form.showPhone)}
-            className={`w-12 h-6 rounded-full transition-colors relative ${form.showPhone ? 'bg-primary-600' : 'bg-gray-300'}`}>
+            className={`w-12 h-6 rounded-full transition-colors relative ${form.showPhone ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
             <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.showPhone ? 'translate-x-6' : ''}`} />
           </button>
         </div>
@@ -139,12 +139,12 @@ export default function SettingsPage() {
 
       {/* Feedback */}
       {error && (
-        <div className="flex items-center gap-2 p-4 bg-red-50 text-red-700 rounded-xl text-sm">
+        <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 rounded-xl text-sm">
           <AlertCircle size={16} /> {error}
         </div>
       )}
       {success && (
-        <div className="flex items-center gap-2 p-4 bg-green-50 text-green-700 rounded-xl text-sm">
+        <div className="flex items-center gap-2 p-4 bg-green-50 dark:bg-emerald-500/10 text-green-700 dark:text-emerald-400 rounded-xl text-sm">
           <CheckCircle size={16} /> Settings saved successfully!
         </div>
       )}

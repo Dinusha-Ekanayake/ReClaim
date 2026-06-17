@@ -51,7 +51,7 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-display font-bold text-white mb-1">User Management</h1>
         <p className="text-gray-400 text-sm">{total} total users</p>
@@ -69,7 +69,8 @@ export default function AdminUsersPage() {
 
       {/* Table */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px]">
           <thead>
             <tr className="border-b border-gray-800">
               {['User', 'Role', 'Items', 'Joined', 'Status', 'Actions'].map(h => (
@@ -147,6 +148,7 @@ export default function AdminUsersPage() {
             ))}
           </tbody>
         </table>
+        </div>
 
         {!loading && users.length === 0 && (
           <div className="text-center py-12 text-gray-500">No users found</div>

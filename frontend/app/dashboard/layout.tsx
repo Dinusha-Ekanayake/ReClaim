@@ -31,15 +31,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-500">
       <Navbar />
-      <div className="pt-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+      {/* ── Mobile tab bar (horizontal scroll) ─────────────────── */}
+      <div className="lg:hidden sticky top-20 z-30 bg-white/95 dark:bg-gray-950/95 backdrop-blur border-b border-gray-100 dark:border-gray-800">
+        <nav className="flex gap-1 overflow-x-auto px-4 py-2 no-scrollbar">
+          {NAV_ITEMS.map(({ href, label, icon: Icon, exact }) => {
+            const active = exact ? pathname === href : pathname.startsWith(href);
+            return (
+              <Link key={href} href={href}
+                aria-current={active ? 'page' : undefined}
+                className={cn('flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all active:scale-95',
+                  active
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800')}>
+                <Icon size={16} />
+                {label}
+              </Link>
+            );
+          })}
+          <Link href="/chat"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium whitespace-nowrap text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all active:scale-95">
+            <MessageSquare size={16} /> Messages
+          </Link>
+        </nav>
+      </div>
+
+      <div className="pt-4 lg:pt-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         <div className="flex gap-8">
-          {/* Sidebar */}
+          {/* Desktop sidebar */}
           <aside className="hidden lg:block w-56 flex-shrink-0">
             <nav className="card p-2 space-y-1 sticky top-24">
               {NAV_ITEMS.map(({ href, label, icon: Icon, exact }) => {
                 const active = exact ? pathname === href : pathname.startsWith(href);
                 return (
                   <Link key={href} href={href}
+                    aria-current={active ? 'page' : undefined}
                     className={cn('flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all',
                       active
                         ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300'

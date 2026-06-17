@@ -5,7 +5,7 @@ interface SpinnerProps { size?: 'sm' | 'md' | 'lg'; className?: string; }
 export function LoadingSpinner({ size = 'md', className }: SpinnerProps) {
   const sizes = { sm: 'w-4 h-4 border-2', md: 'w-8 h-8 border-2', lg: 'w-12 h-12 border-3' };
   return (
-    <div className={cn('rounded-full border-gray-200 border-t-primary-600 animate-spin', sizes[size], className)} />
+    <div className={cn('rounded-full border-gray-200 dark:border-gray-700 border-t-primary-600 dark:border-t-primary-400 animate-spin', sizes[size], className)} />
   );
 }
 
@@ -14,7 +14,7 @@ export function PageLoader() {
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="text-center">
         <LoadingSpinner size="lg" className="mx-auto mb-4" />
-        <p className="text-sm text-gray-400 animate-pulse">Loading…</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500 animate-pulse">Loading…</p>
       </div>
     </div>
   );
@@ -38,7 +38,7 @@ export function SkeletonList({ count = 5 }: { count?: number }) {
   return (
     <div className="space-y-3">
       {[...Array(count)].map((_, i) => (
-        <div key={i} className="flex gap-3 p-4 bg-white rounded-xl border border-gray-100">
+        <div key={i} className="flex gap-3 p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
           <div className="skeleton w-12 h-12 rounded-xl flex-shrink-0" />
           <div className="flex-1 space-y-2">
             <div className="skeleton h-4 w-1/2 rounded" />

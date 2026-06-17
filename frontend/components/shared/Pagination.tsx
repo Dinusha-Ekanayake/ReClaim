@@ -30,23 +30,23 @@ export function Pagination({ page, pages, onPageChange, className }: PaginationP
       <button
         disabled={page === 1}
         onClick={() => onPageChange(page - 1)}
-        className="p-2 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
+        className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
       >
         <ChevronLeft size={16} />
       </button>
 
       {getPages().map((p, i) =>
         p === '...' ? (
-          <span key={`dots-${i}`} className="px-2 text-gray-400 text-sm">…</span>
+          <span key={`dots-${i}`} className="px-2 text-gray-400 dark:text-gray-500 text-sm">…</span>
         ) : (
           <button
             key={p}
             onClick={() => onPageChange(p as number)}
             className={cn(
-              'w-9 h-9 rounded-lg text-sm font-medium transition-colors',
+              'w-9 h-9 rounded-lg text-sm font-medium transition-all active:scale-95',
               page === p
-                ? 'bg-primary-600 text-white'
-                : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
+                ? 'bg-primary-600 text-white shadow-sm shadow-primary-500/30'
+                : 'border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
             )}
           >
             {p}
@@ -57,7 +57,7 @@ export function Pagination({ page, pages, onPageChange, className }: PaginationP
       <button
         disabled={page === pages}
         onClick={() => onPageChange(page + 1)}
-        className="p-2 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
+        className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
       >
         <ChevronRight size={16} />
       </button>

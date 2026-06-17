@@ -49,7 +49,7 @@ export default function AdminItemsPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-display font-bold text-white mb-1">Item Management</h1>
         <p className="text-gray-400 text-sm">{total} total items</p>
@@ -79,7 +79,8 @@ export default function AdminItemsPage() {
 
       {/* Table */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px]">
           <thead>
             <tr className="border-b border-gray-800">
               {['Item', 'Type', 'Posted By', 'Status', 'Reports', 'Approved', 'Actions'].map(h => (
@@ -173,6 +174,7 @@ export default function AdminItemsPage() {
             ))}
           </tbody>
         </table>
+        </div>
         {!loading && items.length === 0 && (
           <div className="text-center py-12 text-gray-500">No items found</div>
         )}

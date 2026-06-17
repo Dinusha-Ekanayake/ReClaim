@@ -6,17 +6,17 @@ export default function HowItWorksPage() {
   return (
     <PublicLayout>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-blue-50 to-green-50 py-20">
+      <section className="bg-gradient-to-br from-blue-50 to-green-50 dark:from-blue-950/30 dark:to-emerald-950/20 py-20 transition-colors duration-500">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl font-display font-bold text-gray-900 mb-6">How ReClaim Works</h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <h1 className="text-5xl font-display font-bold text-gray-900 dark:text-white mb-6">How ReClaim Works</h1>
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
             A simple, secure, and smart system that helps reunite people with their lost belongings.
           </p>
         </div>
       </section>
 
       {/* Steps */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-white dark:bg-gray-950 transition-colors duration-500">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="space-y-16">
             {[
@@ -54,18 +54,18 @@ export default function HowItWorksPage() {
               <div key={s.step} className={`flex flex-col ${i % 2 === 1 ? 'sm:flex-row-reverse' : 'sm:flex-row'} gap-8 items-start`}>
                 <div className="sm:w-1/3 flex-shrink-0">
                   <div className="card p-8 text-center">
-                    <div className="text-xs font-mono font-bold text-gray-300 mb-3">{s.step}</div>
-                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${s.color}`}>
+                    <div className="text-xs font-mono font-bold text-gray-300 dark:text-gray-600 mb-3">{s.step}</div>
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${s.color} dark:bg-white/5`}>
                       {s.icon}
                     </div>
-                    <h2 className="font-display font-bold text-gray-900">{s.title}</h2>
+                    <h2 className="font-display font-bold text-gray-900 dark:text-white">{s.title}</h2>
                   </div>
                 </div>
                 <div className="flex-1 py-4">
-                  <p className="text-gray-600 leading-relaxed mb-5">{s.desc}</p>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-5">{s.desc}</p>
                   <ul className="space-y-2">
                     {s.tips.map(tip => (
-                      <li key={tip} className="flex items-start gap-2 text-sm text-gray-500">
+                      <li key={tip} className="flex items-start gap-2 text-sm text-gray-500 dark:text-gray-400">
                         <Star size={14} className="text-amber-400 flex-shrink-0 mt-0.5 fill-amber-400" />
                         {tip}
                       </li>
@@ -79,10 +79,10 @@ export default function HowItWorksPage() {
       </section>
 
       {/* Safety */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-16 bg-gray-50 dark:bg-gray-900 transition-colors duration-500">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-display font-bold text-gray-900 mb-4">Safety & Privacy</h2>
-          <p className="text-gray-600 mb-10 max-w-xl mx-auto">
+          <h2 className="text-3xl font-display font-bold text-gray-900 dark:text-white mb-4">Safety & Privacy</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-10 max-w-xl mx-auto">
             Your privacy is our priority. ReClaim is designed to connect people while keeping personal information protected.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -93,8 +93,8 @@ export default function HowItWorksPage() {
             ].map(f => (
               <div key={f.title} className="card p-6 text-center">
                 <div className="text-4xl mb-3">{f.icon}</div>
-                <h3 className="font-display font-bold text-gray-900 mb-2">{f.title}</h3>
-                <p className="text-sm text-gray-500">{f.desc}</p>
+                <h3 className="font-display font-bold text-gray-900 dark:text-white mb-2">{f.title}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{f.desc}</p>
               </div>
             ))}
           </div>
