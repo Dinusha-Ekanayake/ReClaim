@@ -1,21 +1,21 @@
 'use client';
 import { useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, Package, Flag, Shield,
-  LogOut, ChevronRight, BarChart2, Bell
+  LogOut, ChevronRight, BarChart2, MessageSquare
 } from 'lucide-react';
 import { useAuthStore, useIsAdmin } from '@/lib/store/authStore';
 import { cn } from '@/lib/utils';
+import { LogoIcon } from '@/components/shared/Logo';
 
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/items', label: 'Items', icon: Package },
   { href: '/admin/reports', label: 'Reports', icon: Flag },
-  { href: '/admin/claims', label: 'Claims', icon: ChevronRight },
+  { href: '/admin/claims', label: 'Claims', icon: MessageSquare },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -38,8 +38,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className="w-60 flex-shrink-0 flex flex-col border-r border-gray-800">
         {/* Logo */}
         <div className="p-5 border-b border-gray-800">
-          <Link href="/admin" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="ReClaim" width={32} height={32} className="rounded-lg" />
+          <Link href="/admin" className="flex items-center gap-2.5">
+            <LogoIcon size="sm" />
             <div>
               <span className="font-display font-bold text-white text-sm">ReClaim</span>
               <span className="block text-xs text-gray-500">Admin Panel</span>

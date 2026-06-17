@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -53,51 +53,83 @@
 
 @layer base {
   * { @apply border-border; }
+  html { scroll-behavior: smooth; }
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    transition: background-color 0.4s ease, color 0.4s ease;
   }
 
   h1, h2, h3, h4, h5, h6 { @apply font-display font-semibold; }
+
+  /* Smooth theme transition for surfaces that swap colors */
+  .theme-transition,
+  .card,
+  .input-field {
+    transition: background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+  }
+
+  /* Respect reduced-motion users globally */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer components {
+  /* ── Buttons ───────────────────────────────────────────────────── */
   .btn-primary {
-    @apply bg-primary-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm 
-           hover:bg-primary-700 transition-all duration-200 shadow-sm hover:shadow-md
+    @apply bg-primary-600 text-white px-6 py-2.5 rounded-xl font-semibold text-sm
+           hover:bg-primary-700 active:scale-[0.97]
+           transition-all duration-200 shadow-sm hover:shadow-md
            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
            disabled:opacity-60 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
-    @apply bg-secondary-500 text-white px-6 py-2.5 rounded-lg font-semibold text-sm
-           hover:bg-secondary-600 transition-all duration-200 shadow-sm hover:shadow-md
+    @apply bg-secondary-500 text-white px-6 py-2.5 rounded-xl font-semibold text-sm
+           hover:bg-secondary-600 active:scale-[0.97]
+           transition-all duration-200 shadow-sm hover:shadow-md
            focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2
            disabled:opacity-60 disabled:cursor-not-allowed;
   }
 
   .btn-outline {
-    @apply border-2 border-primary-600 text-primary-600 px-6 py-2.5 rounded-lg font-semibold text-sm
-           hover:bg-primary-50 transition-all duration-200
+    @apply border-2 border-primary-600 text-primary-600 px-6 py-2.5 rounded-xl font-semibold text-sm
+           hover:bg-primary-50 active:scale-[0.97] transition-all duration-200
            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
   }
 
+  /* ── Cards ─────────────────────────────────────────────────────── */
   .card {
-    @apply bg-white rounded-2xl border border-gray-100 shadow-card hover:shadow-card-hover
+    @apply bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800
+           shadow-card hover:shadow-card-hover
            transition-all duration-300 overflow-hidden;
   }
 
   .card-glass {
-    @apply bg-white/80 backdrop-blur-sm rounded-2xl border border-white/20 shadow-card;
+    @apply bg-white/80 dark:bg-gray-900/70 backdrop-blur-md rounded-2xl
+           border border-white/30 dark:border-white/10 shadow-card;
   }
 
+  .card-hover {
+    @apply card hover:-translate-y-1 cursor-pointer;
+  }
+
+  /* ── Inputs ─────────────────────────────────────────────────────── */
   .input-field {
-    @apply w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white
-           text-gray-900 placeholder-gray-400 text-sm
+    @apply w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700
+           bg-white dark:bg-gray-800
+           text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm
            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
            transition-all duration-200;
   }
 
+  /* ── Badges ─────────────────────────────────────────────────────── */
   .badge-lost {
     @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold
            bg-red-100 text-red-700;
@@ -112,33 +144,179 @@
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
   }
 
-  /* Leaflet map override */
+  /* Pill label used in section headers */
+  .section-pill {
+    @apply inline-flex items-center gap-2 px-4 py-1.5 rounded-full
+           text-xs font-semibold tracking-wide uppercase
+           bg-primary-50 text-primary-700 border border-primary-100;
+  }
+
+  /* Gradient text utility */
+  .gradient-text {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-500;
+  }
+
+  /* ── Leaflet override ───────────────────────────────────────────── */
   .leaflet-container {
     @apply rounded-xl;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
   }
+
+  /* ── Match score badges ─────────────────────────────────────────── */
+  .match-score-high   { @apply bg-green-100 text-green-800; }
+  .match-score-medium { @apply bg-yellow-100 text-yellow-800; }
+  .match-score-low    { @apply bg-gray-100 text-gray-600; }
 }
 
-/* Scrollbar styling */
+/* ════════════════════════════════════════════════
+   Scrollbar
+════════════════════════════════════════════════ */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { @apply bg-gray-100; }
-::-webkit-scrollbar-thumb { @apply bg-gray-300 rounded-full; }
-::-webkit-scrollbar-thumb:hover { @apply bg-gray-400; }
+::-webkit-scrollbar-track { @apply bg-gray-100 dark:bg-gray-900; }
+::-webkit-scrollbar-thumb { @apply bg-gray-300 dark:bg-gray-700 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-gray-400 dark:bg-gray-600; }
 
-/* Loading skeleton animation */
+/* ════════════════════════════════════════════════
+   Skeleton shimmer
+════════════════════════════════════════════════ */
 .skeleton {
-  @apply bg-gray-200 animate-pulse rounded;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  @apply rounded;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
   background-size: 200% 100%;
-  animation: skeleton 1.5s infinite;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+.dark .skeleton {
+  background: linear-gradient(90deg, #1f2937 25%, #283548 50%, #1f2937 75%);
+  background-size: 200% 100%;
 }
 
-@keyframes skeleton {
-  0% { background-position: 200% 0; }
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
 
-/* Match score badge gradient */
-.match-score-high { @apply bg-green-100 text-green-800; }
-.match-score-medium { @apply bg-yellow-100 text-yellow-800; }
-.match-score-low { @apply bg-gray-100 text-gray-600; }
+/* ════════════════════════════════════════════════
+   Keyframe animations
+════════════════════════════════════════════════ */
+
+/* Fade in up — for page sections and modals */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out both;
+}
+/* Stagger helpers */
+.animate-delay-100 { animation-delay: 0.1s; }
+.animate-delay-200 { animation-delay: 0.2s; }
+.animate-delay-300 { animation-delay: 0.3s; }
+.animate-delay-400 { animation-delay: 0.4s; }
+.animate-delay-500 { animation-delay: 0.5s; }
+
+/* Fade in (dropdown panels, toasts) */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-fade-in {
+  animation: fade-in 0.18s ease-out both;
+}
+
+/* Slide in from right (mobile menu, side panels) */
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(100%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Slide in from top (mobile nav drop) */
+@keyframes slide-in-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-in-down {
+  animation: slide-in-down 0.22s ease-out both;
+}
+
+/* Gentle float (decorative blobs) */
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33%       { transform: translateY(-18px) rotate(2deg); }
+  66%       { transform: translateY(-8px) rotate(-1deg); }
+}
+.animate-float { animation: float 7s ease-in-out infinite; }
+.animate-float-slow { animation: float 10s ease-in-out infinite; }
+.animate-float-fast { animation: float 5s ease-in-out infinite; }
+
+/* Pulse ring (notification dot, live indicators) */
+@keyframes pulse-ring {
+  0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+  70%  { transform: scale(1);    box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}
+.animate-pulse-ring { animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite; }
+
+/* Bounce in (emoji badges in hero) */
+@keyframes bounce-in {
+  0%   { opacity: 0; transform: scale(0.3) rotate(-10deg); }
+  50%  { transform: scale(1.08) rotate(3deg); }
+  70%  { transform: scale(0.95) rotate(-1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+.animate-bounce-in { animation: bounce-in 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+
+/* Spin once (success check animations) */
+@keyframes spin-once {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.animate-spin-once { animation: spin-once 0.6s ease-in-out both; }
+
+/* Count-up pulse for stat numbers */
+@keyframes stat-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+.animate-stat-pop { animation: stat-pop 0.4s ease-out; }
+
+/* Gradient shimmer (CTA buttons, premium badges) */
+@keyframes shimmer-move {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.35) 50%, transparent 75%);
+  background-size: 200% auto;
+  animation: shimmer-move 2.5s linear infinite;
+}
+
+/* Wiggle (error states, attention-grabbing) */
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  20%       { transform: rotate(-4deg); }
+  40%       { transform: rotate(4deg); }
+  60%       { transform: rotate(-3deg); }
+  80%       { transform: rotate(2deg); }
+}
+.animate-wiggle { animation: wiggle 0.5s ease-in-out; }
+
+/* ════════════════════════════════════════════════
+   Chat bubbles
+════════════════════════════════════════════════ */
+.chat-bubble-sent {
+  @apply bg-primary-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-xs;
+}
+.chat-bubble-received {
+  @apply bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm max-w-xs;
+}
+
+/* ════════════════════════════════════════════════
+   Admin panel
+════════════════════════════════════════════════ */
+.admin-sidebar::-webkit-scrollbar { width: 4px; }
+.admin-sidebar::-webkit-scrollbar-track { @apply bg-transparent; }
+.admin-sidebar::-webkit-scrollbar-thumb { @apply bg-gray-700 rounded-full; }

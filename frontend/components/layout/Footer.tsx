@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Github, Twitter, Mail, Heart } from 'lucide-react';
+import { LogoIcon } from '@/components/shared/Logo';
 
 export default function Footer() {
   return (
@@ -11,7 +11,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="md:col-span-1">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <Image src="/logo.png" alt="ReClaim" width={32} height={32} className="rounded-lg" />
+              <LogoIcon size="sm" />
               <span className="font-display font-bold text-lg text-white">
                 Re<span className="text-primary-400">Claim</span>
               </span>
@@ -37,8 +37,8 @@ export default function Footer() {
                 ['Lost Items', '/items?type=LOST'],
                 ['Found Items', '/items?type=FOUND'],
                 ['Post an Item', '/items/new'],
-                ['Search', '/search'],
-                ['How It Works', '/how-it-works'],
+                ['Impact Dashboard', '/impact'],
+                ['Browse All', '/items'],
               ].map(([label, href]) => (
                 <li key={href}>
                   <Link href={href} className="hover:text-white transition-colors">{label}</Link>

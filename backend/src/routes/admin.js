@@ -1,10 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const bcrypt = require('bcryptjs');
-
-const prisma = new PrismaClient();
+const { createNotification } = require('../services/notificationService');
 
 // All admin routes require authentication + admin role
 router.use(authenticate, requireAdmin);
@@ -189,6 +188,80 @@ router.delete('/items/:id', async (req, res, next) => {
   try {
     await prisma.item.delete({ where: { id: req.params.id } });
     res.json({ message: 'Item deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Claims ───────────────────────────────────────────────────────────────────
+router.get('/claims', async (req, res, next) => {
+  try {
+    const { status, page = 1, limit = 20 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const where = { ...(status && { status }) };
+
+    const [claims, total] = await Promise.all([
+      prisma.claim.findMany({
+        where, skip, take: Number(limit),
+        orderBy: { createdAt: 'desc' },
+        include: {
+          claimant: { select: { id: true, name: true, email: true, avatarUrl: true } },
+          item: {
+            select: {
+              id: true, title: true, type: true, status: true,
+              user: { select: { id: true, name: true, email: true } },
+            },
+          },
+        },
+      }),
+      prisma.claim.count({ where }),
+    ]);
+
+    res.json({ claims, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/claims/:id', async (req, res, next) => {
+  try {
+    const { status, adminNote } = req.body;
+    if (!['APPROVED', 'REJECTED'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const claim = await prisma.claim.findUnique({
+      where: { id: req.params.id },
+      include: { item: { select: { id: true, title: true } } },
+    });
+    if (!claim) return res.status(404).json({ error: 'Claim not found' });
+
+    const updated = await prisma.claim.update({
+      where: { id: req.params.id },
+      data: { status, adminNote, reviewedAt: new Date(), reviewedBy: req.user.id },
+      select: { id: true, status: true, adminNote: true },
+    });
+
+    if (status === 'APPROVED') {
+      await prisma.item.update({ where: { id: claim.itemId }, data: { status: 'RETURNED' } });
+      await createNotification(
+        claim.claimantId, 'CLAIM_APPROVED',
+        'Your claim was approved!',
+        `Your claim for "${claim.item.title}" has been approved by an admin.`,
+        `/items/${claim.itemId}`
+      );
+    } else {
+      await prisma.item.update({ where: { id: claim.itemId }, data: { status: 'ACTIVE' } });
+      await createNotification(
+        claim.claimantId, 'CLAIM_REJECTED',
+        'Claim not approved',
+        `Your claim for "${claim.item.title}" was not approved.`,
+        `/items/${claim.itemId}`
+      );
+    }
+
+    res.json(updated);
   } catch (err) {
     next(err);
   }

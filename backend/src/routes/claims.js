@@ -4,9 +4,7 @@ const { body } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { createNotification } = require('../services/notificationService');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // POST /api/claims — submit a claim for a found item
 router.post('/',

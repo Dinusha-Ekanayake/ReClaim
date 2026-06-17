@@ -1,9 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { computeMatches } = require('../services/matchingService');
 const { generateEmbedding } = require('../services/embeddingService');
 const { createNotification } = require('../services/notificationService');
-
-const prisma = new PrismaClient();
 
 const ITEMS_PER_PAGE = 12;
 
@@ -253,7 +251,7 @@ exports.updateStatus = async (req, res, next) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const VALID = ['ACTIVE', 'MATCHED', 'CLAIM_PENDING', 'RETURNED', 'CLOSED'];
+    const VALID = ['ACTIVE', 'MATCHED', 'CLAIM_PENDING', 'RETURNED', 'CLOSED', 'REJECTED'];
     if (!VALID.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }

@@ -3,9 +3,7 @@ const router = express.Router();
 const { body } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const VALID_REASONS = ['FAKE', 'INAPPROPRIATE', 'SPAM', 'WRONG_CATEGORY', 'OTHER'];
 

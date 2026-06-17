@@ -29,7 +29,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!isLoggedIn) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-500">
       <Navbar />
       <div className="pt-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex gap-8">
@@ -41,23 +41,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 return (
                   <Link key={href} href={href}
                     className={cn('flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all',
-                      active ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50')}>
+                      active
+                        ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800')}>
                     <Icon size={18} />
                     {label}
                   </Link>
                 );
               })}
               <Link href="/chat"
-                className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all">
+                className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
                 <MessageSquare size={18} /> Messages
               </Link>
-              <div className="border-t border-gray-100 mt-2 pt-2">
+              <div className="border-t border-gray-100 dark:border-gray-800 mt-2 pt-2">
                 <Link href="/items/new"
-                  className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-secondary-600 hover:bg-green-50 transition-all">
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-secondary-600 dark:text-emerald-400 hover:bg-green-50 dark:hover:bg-emerald-500/10 transition-all">
                   <Plus size={18} /> Post Item
                 </Link>
                 <button onClick={async () => { await logout(); router.push('/'); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-all">
+                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all">
                   <LogOut size={18} /> Sign Out
                 </button>
               </div>

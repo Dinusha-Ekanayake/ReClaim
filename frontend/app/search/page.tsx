@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { Search, X } from 'lucide-react';
 import PublicLayout from '@/components/layout/PublicLayout';
 import ItemCard from '@/components/items/ItemCard';
@@ -11,8 +12,9 @@ import { useDebounce } from '@/hooks';
 import api from '@/lib/api';
 import { CATEGORIES, COLORS, cn } from '@/lib/utils';
 
-export default function SearchPage() {
-  const router = useRouter();
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+function SearchPageContent() {
   const searchParams = useSearchParams();
 
   const [query, setQuery] = useState(searchParams.get('q') || '');
@@ -47,11 +49,12 @@ export default function SearchPage() {
   const hasFilters = !!(query || type || category || color);
 
   return (
-    <PublicLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Search bar */}
-        <div className="max-w-2xl mx-auto mb-10">
-          <h1 className="text-3xl font-display font-bold text-gray-900 text-center mb-6">Search Items</h1>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }}
+          className="max-w-2xl mx-auto mb-10">
+          <h1 className="text-3xl font-display font-bold text-gray-900 dark:text-white text-center mb-6">Search Items</h1>
           <div className="relative">
             <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -69,16 +72,16 @@ export default function SearchPage() {
               </button>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Filter row */}
         <div className="flex flex-wrap gap-3 mb-8 items-center">
           {/* Type */}
-          <div className="flex bg-gray-100 rounded-xl p-1">
+          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
             {[{ v: '', l: 'All' }, { v: 'LOST', l: '🔍 Lost' }, { v: 'FOUND', l: '📦 Found' }].map(opt => (
               <button key={opt.v} onClick={() => { setType(opt.v); setPage(1); }}
                 className={cn('px-4 py-1.5 rounded-lg text-sm font-medium transition-all',
-                  type === opt.v ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700')}>
+                  type === opt.v ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200')}>
                 {opt.l}
               </button>
             ))}
@@ -106,7 +109,7 @@ export default function SearchPage() {
           )}
 
           {pagination && (
-            <span className="text-sm text-gray-400 ml-auto">
+            <span className="text-sm text-gray-400 dark:text-gray-500 ml-auto">
               {pagination.total} result{pagination.total !== 1 ? 's' : ''}
             </span>
           )}
@@ -140,6 +143,15 @@ export default function SearchPage() {
           </>
         )}
       </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <PublicLayout>
+      <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-20 text-center text-gray-400">Loading…</div>}>
+        <SearchPageContent />
+      </Suspense>
     </PublicLayout>
   );
 }
