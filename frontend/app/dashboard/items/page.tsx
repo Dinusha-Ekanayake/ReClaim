@@ -43,8 +43,8 @@ export default function MyItemsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold text-gray-900 mb-1">My Items</h1>
-          <p className="text-gray-500 text-sm">{total} items total</p>
+          <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white mb-1">My Items</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">{total} items total</p>
         </div>
         <Link href="/items/new" className="btn-primary flex items-center gap-2">
           <Plus size={16} /> Post Item
@@ -56,7 +56,9 @@ export default function MyItemsPage() {
         {FILTERS.map((filter, i) => (
           <button key={i} onClick={() => { setActiveFilter(i); setPage(1); }}
             className={cn('px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all',
-              activeFilter === i ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300')}>
+              activeFilter === i
+                ? 'bg-primary-600 text-white'
+                : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600')}>
             {filter.label}
           </button>
         ))}
@@ -78,8 +80,8 @@ export default function MyItemsPage() {
       ) : items.length === 0 ? (
         <div className="card p-16 text-center">
           <div className="text-5xl mb-4">📭</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No items yet</h3>
-          <p className="text-gray-500 mb-6 text-sm">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No items yet</h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">
             {activeFilter === 0 ? "You haven't posted any items yet." : `No ${f.type || f.status} items found.`}
           </p>
           {activeFilter === 0 && (
@@ -96,12 +98,12 @@ export default function MyItemsPage() {
           {total > 12 && (
             <div className="flex justify-center gap-2 mt-4">
               <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                className="px-4 py-2 rounded-lg border border-gray-200 text-sm disabled:opacity-40 hover:bg-gray-50">
+                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800">
                 Previous
               </button>
-              <span className="px-4 py-2 text-sm text-gray-500">Page {page}</span>
+              <span className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">Page {page}</span>
               <button disabled={page * 12 >= total} onClick={() => setPage(p => p + 1)}
-                className="px-4 py-2 rounded-lg border border-gray-200 text-sm disabled:opacity-40 hover:bg-gray-50">
+                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800">
                 Next
               </button>
             </div>

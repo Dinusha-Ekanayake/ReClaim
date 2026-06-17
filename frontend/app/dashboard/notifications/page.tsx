@@ -26,18 +26,18 @@ export default function NotificationsPage() {
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold text-gray-900 mb-1">Notifications</h1>
-          <p className="text-gray-500 text-sm">{unreadCount} unread</p>
+          <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white mb-1">Notifications</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">{unreadCount} unread</p>
         </div>
         {unreadCount > 0 && (
           <button onClick={markAllRead}
-            className="flex items-center gap-2 text-sm text-primary-600 hover:underline font-medium">
+            className="flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">
             <CheckCheck size={16} /> Mark all read
           </button>
         )}
       </div>
 
-      <div className="card divide-y divide-gray-50">
+      <div className="card divide-y divide-gray-50 dark:divide-gray-800">
         {isLoading ? (
           [...Array(5)].map((_, i) => (
             <div key={i} className="flex gap-4 p-4">
@@ -50,28 +50,28 @@ export default function NotificationsPage() {
           ))
         ) : notifications.length === 0 ? (
           <div className="text-center py-16">
-            <Bell size={40} className="text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-400 font-medium">No notifications yet</p>
-            <p className="text-sm text-gray-300 mt-1">We'll notify you when something happens</p>
+            <Bell size={40} className="text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-400 dark:text-gray-500 font-medium">No notifications yet</p>
+            <p className="text-sm text-gray-300 dark:text-gray-600 mt-1">We'll notify you when something happens</p>
           </div>
         ) : notifications.map(n => (
           <button key={n.id}
             onClick={() => { markRead(n.id); if (n.link) router.push(n.link); }}
-            className={cn('w-full flex items-start gap-4 p-4 text-left hover:bg-gray-50 transition-colors',
-              !n.isRead && 'bg-blue-50/40')}>
+            className={cn('w-full flex items-start gap-4 p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors',
+              !n.isRead && 'bg-blue-50/40 dark:bg-primary-500/10')}>
             <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg',
-              !n.isRead ? 'bg-primary-100' : 'bg-gray-100')}>
+              !n.isRead ? 'bg-primary-100 dark:bg-primary-500/20' : 'bg-gray-100 dark:bg-gray-800')}>
               {TYPE_ICONS[n.type] || '📢'}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
-                <p className={cn('text-sm font-semibold', !n.isRead ? 'text-gray-900' : 'text-gray-700')}>
+                <p className={cn('text-sm font-semibold', !n.isRead ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300')}>
                   {n.title}
                 </p>
                 {!n.isRead && <span className="w-2 h-2 bg-primary-500 rounded-full flex-shrink-0 mt-1.5" />}
               </div>
-              <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
-              <p className="text-xs text-gray-400 mt-1.5">{timeAgo(n.createdAt)}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n.body}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">{timeAgo(n.createdAt)}</p>
             </div>
           </button>
         ))}

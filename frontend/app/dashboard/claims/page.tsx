@@ -10,9 +10,9 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { SkeletonList } from '@/components/shared/LoadingSpinner';
 
 const STATUS_STYLES: Record<string, string> = {
-  PENDING:  'bg-amber-100 text-amber-700',
-  APPROVED: 'bg-green-100 text-green-700',
-  REJECTED: 'bg-red-100  text-red-700',
+  PENDING:  'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  APPROVED: 'bg-green-100 dark:bg-emerald-500/15 text-green-700 dark:text-emerald-400',
+  REJECTED: 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-400',
 };
 
 const STATUS_ICONS: Record<string, JSX.Element> = {
@@ -72,8 +72,8 @@ export default function ClaimsPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-display font-bold text-gray-900 mb-1">Claims</h1>
-        <p className="text-gray-500 text-sm">Manage ownership claims on found items</p>
+        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white mb-1">Claims</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">Manage ownership claims on found items</p>
       </div>
 
       {/* Tabs */}
@@ -81,7 +81,7 @@ export default function ClaimsPage() {
         {(['received', 'submitted'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={cn('px-5 py-2 rounded-xl text-sm font-semibold transition-all',
-              tab === t ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300')}>
+              tab === t ? 'bg-primary-600 text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600')}>
             {t === 'received' ? (
               <>Received {pendingCount > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">{pendingCount}</span>}</>
             ) : 'My Submissions'}
@@ -110,8 +110,8 @@ export default function ClaimsPage() {
                       </div>
                     )}
                     <div>
-                      <p className="font-semibold text-gray-900 text-sm">{claim.claimant?.name}</p>
-                      <p className="text-xs text-gray-400">{claim.claimant?.email}</p>
+                      <p className="font-semibold text-gray-900 dark:text-white text-sm">{claim.claimant?.name}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">{claim.claimant?.email}</p>
                     </div>
                   </div>
                   <span className={cn('flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold',
@@ -121,14 +121,14 @@ export default function ClaimsPage() {
                 </div>
 
                 {/* Item context */}
-                <div className="flex items-center gap-2 mb-4 p-3 bg-gray-50 rounded-xl">
+                <div className="flex items-center gap-2 mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
                   <div className="text-lg">{claim.item?.type === 'FOUND' ? '📦' : '🔍'}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{claim.item?.title}</p>
-                    <p className="text-xs text-gray-400">{claim.item?.locationLabel}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{claim.item?.title}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">{claim.item?.locationLabel}</p>
                   </div>
                   <Link href={`/items/${claim.item?.id}`}
-                    className="flex items-center gap-1 text-xs text-primary-600 hover:underline flex-shrink-0">
+                    className="flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0">
                     <Eye size={12} /> View
                   </Link>
                 </div>
@@ -136,12 +136,12 @@ export default function ClaimsPage() {
                 {/* Verification answers */}
                 {claim.verificationAnswers && Object.keys(claim.verificationAnswers).length > 0 && (
                   <div className="mb-4">
-                    <p className="text-xs font-semibold text-gray-600 mb-2">Verification Answers</p>
+                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">Verification Answers</p>
                     <div className="space-y-2">
                       {Object.entries(claim.verificationAnswers).map(([key, answer], i) => (
-                        <div key={key} className="bg-gray-50 rounded-lg px-3 py-2">
-                          <p className="text-xs text-gray-400 mb-0.5">Question {i + 1}</p>
-                          <p className="text-sm text-gray-800">{answer as string}</p>
+                        <div key={key} className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Question {i + 1}</p>
+                          <p className="text-sm text-gray-800 dark:text-gray-200">{answer as string}</p>
                         </div>
                       ))}
                     </div>
@@ -150,14 +150,14 @@ export default function ClaimsPage() {
 
                 {/* Message */}
                 {claim.message && (
-                  <div className="mb-4 p-3 bg-blue-50 rounded-xl">
-                    <p className="text-xs font-semibold text-blue-700 mb-1">Message from claimant</p>
-                    <p className="text-sm text-gray-700">"{claim.message}"</p>
+                  <div className="mb-4 p-3 bg-blue-50 dark:bg-primary-500/10 rounded-xl">
+                    <p className="text-xs font-semibold text-blue-700 dark:text-primary-300 mb-1">Message from claimant</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">"{claim.message}"</p>
                   </div>
                 )}
 
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">{timeAgo(claim.createdAt)}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{timeAgo(claim.createdAt)}</span>
                   {claim.status === 'PENDING' && (
                     <div className="flex gap-2">
                       <button
@@ -165,13 +165,13 @@ export default function ClaimsPage() {
                           const chat = await api.post('/chats', { recipientId: claim.claimantId });
                           window.open(`/chat/${chat.id}`, '_blank');
                         }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                         <MessageSquare size={13} /> Chat
                       </button>
                       <button
                         onClick={() => handleReview(claim.id, 'REJECTED')}
                         disabled={processing === claim.id}
-                        className="px-4 py-1.5 border border-red-200 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-50 transition-colors disabled:opacity-50">
+                        className="px-4 py-1.5 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 rounded-lg text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50">
                         Reject
                       </button>
                       <button
@@ -200,17 +200,17 @@ export default function ClaimsPage() {
           <div className="space-y-4">
             {myClaims.map((claim: any) => (
               <div key={claim.id} className="card p-5 flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 overflow-hidden">
                   {claim.item?.images?.[0]?.url
                     ? <Image src={claim.item.images[0].url} alt="" width={56} height={56} className="object-cover w-full h-full" />
                     : <span className="text-2xl">📦</span>}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{claim.item?.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{timeAgo(claim.createdAt)}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white truncate">{claim.item?.title}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{timeAgo(claim.createdAt)}</p>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  <Link href={`/items/${claim.item?.id}`} className="text-xs text-primary-600 hover:underline">
+                  <Link href={`/items/${claim.item?.id}`} className="text-xs text-primary-600 dark:text-primary-400 hover:underline">
                     View item
                   </Link>
                   <span className={cn('flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold',
