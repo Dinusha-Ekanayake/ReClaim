@@ -56,17 +56,17 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { icon: <Package size={20} />, label: 'Total Items', value: stats.total, color: 'bg-blue-50 text-primary-600' },
-          { icon: <Clock size={20} />, label: 'Active', value: stats.active, color: 'bg-amber-50 text-amber-600' },
-          { icon: <CheckCircle size={20} />, label: 'Returned', value: stats.returned, color: 'bg-green-50 text-secondary-600' },
-          { icon: <Star size={20} />, label: 'Claims', value: stats.claims, color: 'bg-purple-50 text-purple-600' },
+          { icon: <Package size={20} />, label: 'Total Items', value: stats.total, color: 'bg-blue-50 dark:bg-blue-500/10 text-primary-600 dark:text-primary-400' },
+          { icon: <Clock size={20} />, label: 'Active', value: stats.active, color: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' },
+          { icon: <CheckCircle size={20} />, label: 'Returned', value: stats.returned, color: 'bg-green-50 dark:bg-emerald-500/10 text-secondary-600 dark:text-emerald-400' },
+          { icon: <Star size={20} />, label: 'Claims', value: stats.claims, color: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400' },
         ].map(stat => (
           <div key={stat.label} className="card p-5">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${stat.color}`}>
               {stat.icon}
             </div>
-            <div className="text-2xl font-display font-bold text-gray-900">{stat.value}</div>
-            <div className="text-sm text-gray-500">{stat.label}</div>
+            <div className="text-2xl font-display font-bold text-gray-900 dark:text-white">{stat.value}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</div>
           </div>
         ))}
       </div>
@@ -74,18 +74,18 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { href: '/items/new?type=LOST', icon: '🔍', label: 'Report Lost Item', desc: 'I lost something', color: 'hover:border-red-300 hover:bg-red-50' },
-          { href: '/items/new?type=FOUND', icon: '📦', label: 'Post Found Item', desc: 'I found something', color: 'hover:border-green-300 hover:bg-green-50' },
-          { href: '/chat', icon: '💬', label: 'My Messages', desc: 'View conversations', color: 'hover:border-blue-300 hover:bg-blue-50' },
+          { href: '/items/new?type=LOST', icon: '🔍', label: 'Report Lost Item', desc: 'I lost something', color: 'hover:border-red-300 hover:bg-red-50 dark:hover:border-red-500/40 dark:hover:bg-red-500/10' },
+          { href: '/items/new?type=FOUND', icon: '📦', label: 'Post Found Item', desc: 'I found something', color: 'hover:border-green-300 hover:bg-green-50 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10' },
+          { href: '/chat', icon: '💬', label: 'My Messages', desc: 'View conversations', color: 'hover:border-blue-300 hover:bg-blue-50 dark:hover:border-blue-500/40 dark:hover:bg-blue-500/10' },
         ].map(action => (
           <Link key={action.href} href={action.href}
             className={`card p-5 flex items-center gap-4 border border-transparent transition-all group ${action.color}`}>
             <span className="text-3xl">{action.icon}</span>
             <div>
-              <p className="font-semibold text-gray-900 text-sm group-hover:text-gray-700">{action.label}</p>
-              <p className="text-xs text-gray-400">{action.desc}</p>
+              <p className="font-semibold text-gray-900 dark:text-white text-sm group-hover:text-gray-700 dark:group-hover:text-gray-200">{action.label}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">{action.desc}</p>
             </div>
-            <ArrowRight size={16} className="ml-auto text-gray-300 group-hover:text-gray-500 transition-colors" />
+            <ArrowRight size={16} className="ml-auto text-gray-300 dark:text-gray-600 group-hover:text-gray-500 transition-colors" />
           </Link>
         ))}
       </div>
@@ -93,8 +93,8 @@ export default function DashboardPage() {
       {/* My Items */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display font-bold text-gray-900 text-lg">My Recent Items</h3>
-          <Link href="/dashboard/items" className="text-sm text-primary-600 hover:underline flex items-center gap-1">
+          <h3 className="font-display font-bold text-gray-900 dark:text-white text-lg">My Recent Items</h3>
+          <Link href="/dashboard/items" className="text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1">
             View all <ArrowRight size={14} />
           </Link>
         </div>
@@ -113,7 +113,7 @@ export default function DashboardPage() {
         ) : items.length === 0 ? (
           <div className="card p-10 text-center">
             <div className="text-4xl mb-3">📭</div>
-            <p className="text-gray-500 mb-4">You haven't posted any items yet</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">You haven't posted any items yet</p>
             <Link href="/items/new" className="btn-primary inline-flex items-center gap-2">
               <Plus size={16} /> Post Your First Item
             </Link>

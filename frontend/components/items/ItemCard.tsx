@@ -25,14 +25,14 @@ export default function ItemCard({ item, showStatus = false, className }: ItemCa
   return (
     <Link href={`/items/${item.id}`}
       className={cn(
-        'group block bg-white rounded-2xl border border-gray-100 overflow-hidden',
-        'shadow-sm hover:shadow-xl hover:-translate-y-1.5',
+        'group block bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden',
+        'shadow-sm hover:shadow-xl dark:shadow-black/20 dark:hover:shadow-black/40 hover:-translate-y-1.5',
         'transition-all duration-300',
         className
       )}>
 
       {/* ── Image area ─────────────────────────────────────────── */}
-      <div className="relative h-48 overflow-hidden bg-gray-50">
+      <div className="relative h-48 overflow-hidden bg-gray-50 dark:bg-gray-800">
         {primaryImage ? (
           <Image
             src={primaryImage}
@@ -44,10 +44,10 @@ export default function ItemCard({ item, showStatus = false, className }: ItemCa
           /* Placeholder with category colour */
           <div className={cn(
             'h-full flex flex-col items-center justify-center gap-2',
-            isLost ? 'bg-red-50' : 'bg-emerald-50'
+            isLost ? 'bg-red-50 dark:bg-red-500/10' : 'bg-emerald-50 dark:bg-emerald-500/10'
           )}>
             <span className="text-5xl">{catEmoji}</span>
-            <span className="text-xs font-medium text-gray-400">{item.category}</span>
+            <span className="text-xs font-medium text-gray-400 dark:text-gray-500">{item.category}</span>
           </div>
         )}
 
@@ -88,18 +88,18 @@ export default function ItemCard({ item, showStatus = false, className }: ItemCa
       <div className="p-4">
         {/* Title + category */}
         <div className="flex items-start justify-between gap-2 mb-1.5">
-          <h3 className="font-display font-semibold text-gray-900 text-sm leading-snug
-                         line-clamp-1 group-hover:text-primary-600 transition-colors">
+          <h3 className="font-display font-semibold text-gray-900 dark:text-white text-sm leading-snug
+                         line-clamp-1 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
             {item.title}
           </h3>
-          <span className="flex-shrink-0 text-[11px] font-medium text-gray-500
-                           bg-gray-100 px-2 py-0.5 rounded-full leading-5">
+          <span className="flex-shrink-0 text-[11px] font-medium text-gray-500 dark:text-gray-400
+                           bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full leading-5">
             {item.category}
           </span>
         </div>
 
         {/* Description */}
-        <p className="text-xs text-gray-400 mb-3.5 line-clamp-2 leading-relaxed">
+        <p className="text-xs text-gray-400 dark:text-gray-500 mb-3.5 line-clamp-2 leading-relaxed">
           {truncate(item.description, 90)}
         </p>
 
@@ -116,7 +116,7 @@ export default function ItemCard({ item, showStatus = false, className }: ItemCa
         </div>
 
         {/* Footer */}
-        <div className="mt-3.5 pt-3 border-t border-gray-50 flex items-center justify-between">
+        <div className="mt-3.5 pt-3 border-t border-gray-50 dark:border-gray-800 flex items-center justify-between">
           {/* User avatar + name */}
           <div className="flex items-center gap-2">
             {item.user?.avatarUrl ? (

@@ -1,9 +1,13 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { ArrowRight, Search, MessageSquare, CheckCircle, Shield, Zap, Users, TrendingUp } from 'lucide-react';
 import api from '@/lib/api';
 import ItemCard from '@/components/items/ItemCard';
+import { Reveal } from '@/components/shared/motion';
+import { IMAGES } from '@/lib/images';
 import { CATEGORIES } from '@/lib/utils';
 
 // ─── Animated counter hook ────────────────────────────────────────────────────
@@ -55,10 +59,10 @@ function StatCard({ icon, rawValue, numValue, label, bg, delay }:
                       group-hover:scale-110 transition-transform duration-300`}>
         {icon}
       </div>
-      <div className={`text-3xl font-display font-extrabold text-gray-900 mb-1 ${inView ? 'animate-stat-pop' : ''}`}>
+      <div className={`text-3xl font-display font-extrabold text-gray-900 dark:text-white mb-1 ${inView ? 'animate-stat-pop' : ''}`}>
         {displayValue}
       </div>
-      <div className="text-sm text-gray-500 font-medium">{label}</div>
+      <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">{label}</div>
     </div>
   );
 }
@@ -76,7 +80,7 @@ export function StatsSection() {
       rawValue: data ? `${(data.items?.total ?? 0).toLocaleString()}+` : '—',
       numValue: data?.items?.total ?? 0,
       label: 'Items Reported',
-      bg: 'bg-blue-50',
+      bg: 'bg-blue-50 dark:bg-blue-500/10',
       delay: '0s',
     },
     {
@@ -84,7 +88,7 @@ export function StatsSection() {
       rawValue: data ? `${(data.items?.returned ?? 0).toLocaleString()}+` : '—',
       numValue: data?.items?.returned ?? 0,
       label: 'Items Returned',
-      bg: 'bg-emerald-50',
+      bg: 'bg-emerald-50 dark:bg-emerald-500/10',
       delay: '0.1s',
     },
     {
@@ -92,7 +96,7 @@ export function StatsSection() {
       rawValue: data ? `${(data.users?.total ?? 0).toLocaleString()}+` : '—',
       numValue: data?.users?.total ?? 0,
       label: 'Registered Users',
-      bg: 'bg-amber-50',
+      bg: 'bg-amber-50 dark:bg-amber-500/10',
       delay: '0.2s',
     },
     {
@@ -100,13 +104,13 @@ export function StatsSection() {
       rawValue: data ? `${data.successRate ?? 0}%` : '—',
       numValue: data?.successRate ?? 0,
       label: 'Success Rate',
-      bg: 'bg-purple-50',
+      bg: 'bg-purple-50 dark:bg-purple-500/10',
       delay: '0.3s',
     },
   ];
 
   return (
-    <section className="py-16 bg-white">
+    <section className="py-16 bg-white dark:bg-gray-950 transition-colors duration-500">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map(s => <StatCard key={s.label} {...s} />)}
@@ -164,9 +168,9 @@ export function HowItWorks() {
   ];
 
   return (
-    <section className="py-24 bg-gray-50 relative overflow-hidden">
+    <section className="py-24 bg-gray-50 dark:bg-gray-900 relative overflow-hidden transition-colors duration-500">
       {/* Subtle background pattern */}
-      <div className="absolute inset-0 opacity-[0.03]"
+      <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
         style={{ backgroundImage: 'radial-gradient(circle, #374151 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -174,11 +178,11 @@ export function HowItWorks() {
           <div className="section-pill mx-auto mb-4">
             <TrendingUp size={13} /> How it works
           </div>
-          <h2 className={`text-4xl sm:text-5xl font-display font-extrabold text-gray-900 mb-4
+          <h2 className={`text-4xl sm:text-5xl font-display font-extrabold text-gray-900 dark:text-white mb-4
                           ${inView ? 'animate-fade-in-up' : 'opacity-0'}`}>
             Four steps to a reunion
           </h2>
-          <p className={`text-lg text-gray-500 max-w-xl mx-auto
+          <p className={`text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto
                         ${inView ? 'animate-fade-in-up animate-delay-100' : 'opacity-0'}`}>
             Simple. Secure. Smart.
           </p>
@@ -199,7 +203,7 @@ export function HowItWorks() {
               )}
 
               <div className="card p-6 h-full group-hover:-translate-y-2 transition-all duration-300
-                              group-hover:shadow-lg">
+                              group-hover:shadow-lg dark:bg-gray-800/60">
                 {/* Step number */}
                 <div className={`inline-flex items-center justify-center w-8 h-8 rounded-lg
                                  bg-gradient-to-br ${step.gradient} text-white text-xs font-bold
@@ -208,14 +212,14 @@ export function HowItWorks() {
                 </div>
 
                 {/* Icon */}
-                <div className={`w-14 h-14 rounded-2xl ${step.bg} ring-4 ${step.ring}/30
+                <div className={`w-14 h-14 rounded-2xl ${step.bg} dark:bg-white/5 ring-4 ${step.ring}/30 dark:ring-white/5
                                  flex items-center justify-center mb-4 ${step.color}
                                  group-hover:scale-110 transition-transform duration-300`}>
                   {step.icon}
                 </div>
 
-                <h3 className="font-display font-bold text-gray-900 text-lg mb-2">{step.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{step.desc}</p>
+                <h3 className="font-display font-bold text-gray-900 dark:text-white text-lg mb-2">{step.title}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{step.desc}</p>
               </div>
             </div>
           ))}
@@ -254,17 +258,17 @@ export function CategoriesGrid() {
   const { ref, inView } = useInView(0.15);
 
   return (
-    <section className="py-24 bg-white">
+    <section className="py-24 bg-white dark:bg-gray-950 transition-colors duration-500">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14" ref={ref}>
           <div className="section-pill mx-auto mb-4">
             <Search size={13} /> Browse items
           </div>
-          <h2 className={`text-4xl sm:text-5xl font-display font-extrabold text-gray-900 mb-3
+          <h2 className={`text-4xl sm:text-5xl font-display font-extrabold text-gray-900 dark:text-white mb-3
                           ${inView ? 'animate-fade-in-up' : 'opacity-0'}`}>
             Browse by Category
           </h2>
-          <p className={`text-gray-500 max-w-md mx-auto
+          <p className={`text-gray-500 dark:text-gray-400 max-w-md mx-auto
                         ${inView ? 'animate-fade-in-up animate-delay-100' : 'opacity-0'}`}>
             Find items faster by exploring specific categories
           </p>
@@ -280,12 +284,13 @@ export function CategoriesGrid() {
                 className={`group flex flex-col items-center gap-2.5 p-5 rounded-2xl
                             border border-transparent ring-2 ring-transparent
                             transition-all duration-250 hover:-translate-y-1 hover:shadow-md
+                            dark:!bg-gray-900 dark:hover:!bg-gray-800 dark:ring-gray-800 dark:hover:ring-gray-700
                             ${colors} ${inView ? 'animate-fade-in-up' : 'opacity-0'}`}
                 style={{ animationDelay: `${0.05 * i}s` }}>
                 <span className="text-3xl group-hover:scale-125 transition-transform duration-300 drop-shadow-sm">
                   {cat.icon}
                 </span>
-                <span className="text-xs font-semibold leading-tight text-center">
+                <span className="text-xs font-semibold leading-tight text-center dark:text-gray-200">
                   {cat.label}
                 </span>
               </Link>
@@ -314,17 +319,17 @@ export function RecentItems() {
   }, []);
 
   return (
-    <section className="py-24 bg-gray-50">
+    <section className="py-24 bg-gray-50 dark:bg-gray-900 transition-colors duration-500">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-14">
+        <Reveal className="text-center mb-14">
           <div className="section-pill mx-auto mb-4">
             <Zap size={13} /> Latest activity
           </div>
-          <h2 className="text-4xl sm:text-5xl font-display font-extrabold text-gray-900 mb-3">
+          <h2 className="text-4xl sm:text-5xl font-display font-extrabold text-gray-900 dark:text-white mb-3">
             Recent Reports
           </h2>
-          <p className="text-gray-500">See the latest lost and found items near you</p>
-        </div>
+          <p className="text-gray-500 dark:text-gray-400">See the latest lost and found items near you</p>
+        </Reveal>
 
         {/* Lost */}
         <ItemGroup
@@ -355,7 +360,7 @@ function ItemGroup({ title, dotColor, href, items, loading }:
   return (
     <div>
       <div className="flex items-center justify-between mb-7">
-        <h3 className="flex items-center gap-2.5 text-xl font-display font-bold text-gray-900">
+        <h3 className="flex items-center gap-2.5 text-xl font-display font-bold text-gray-900 dark:text-white">
           <span className={`w-3 h-3 rounded-full ${dotColor} flex-shrink-0`} />
           {title}
         </h3>

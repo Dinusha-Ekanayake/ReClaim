@@ -1,11 +1,14 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/authStore';
 import { ApiError } from '@/lib/api';
 import { LogoIcon } from '@/components/shared/Logo';
+import { IMAGES } from '@/lib/images';
 
 const BENEFITS = [
   '✓  Post lost or found items instantly',
@@ -46,16 +49,23 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-white dark:bg-gray-950">
       {/* ── Left panel ─────────────────────────────────────────── */}
       <div className="hidden lg:flex lg:w-[52%] bg-gradient-to-br from-emerald-500 via-emerald-600 to-primary-700
                       flex-col items-center justify-center p-14 relative overflow-hidden">
-        <div className="absolute top-[-20%] right-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-[-15%] left-[-10%] w-80 h-80 bg-emerald-400/20 rounded-full blur-3xl" />
+        {/* Background photo */}
+        <Image src={IMAGES.reunite} alt="" fill priority
+          className="object-cover opacity-20 mix-blend-luminosity" sizes="52vw" />
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/85 via-emerald-700/85 to-primary-800/90" />
+        <div className="absolute top-[-20%] right-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl animate-float-slow" />
+        <div className="absolute bottom-[-15%] left-[-10%] w-80 h-80 bg-emerald-400/20 rounded-full blur-3xl animate-float" />
         <div className="absolute inset-0 opacity-[0.04]"
           style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
 
-        <div className="relative z-10 text-white text-center max-w-md w-full">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="relative z-10 text-white text-center max-w-md w-full">
           {/* Large logo */}
           <div className="flex justify-center mb-8">
             <div className="w-24 h-24 rounded-3xl bg-white/20 backdrop-blur-sm border border-white/30
@@ -81,45 +91,48 @@ export default function RegisterPage() {
             &ldquo;ReClaim helped me get my wallet back within hours. The AI matching is incredible!&rdquo;
             <div className="mt-2 text-xs text-emerald-300 font-semibold">— Kasun P., Colombo</div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* ── Right panel ────────────────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-white">
-        <div className="w-full max-w-md">
+      <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-gray-950 transition-colors duration-500">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+          className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden mb-10 flex flex-col items-center gap-3">
             <LogoIcon size="lg" />
-            <span className="font-display font-extrabold text-3xl text-gray-900">
-              Re<span className="text-primary-600">Claim</span>
+            <span className="font-display font-extrabold text-3xl text-gray-900 dark:text-white">
+              Re<span className="text-primary-600 dark:text-primary-400">Claim</span>
             </span>
           </div>
 
-          <h2 className="text-3xl font-display font-bold text-gray-900 mb-1">Create your account</h2>
-          <p className="text-gray-500 mb-8 text-sm">
+          <h2 className="text-3xl font-display font-bold text-gray-900 dark:text-white mb-1">Create your account</h2>
+          <p className="text-gray-500 dark:text-gray-400 mb-8 text-sm">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-primary-600 hover:text-primary-700 font-semibold">Sign in</Link>
+            <Link href="/auth/login" className="text-primary-600 dark:text-primary-400 hover:text-primary-700 font-semibold">Sign in</Link>
           </p>
 
           {error && (
-            <div className="flex items-center gap-2.5 p-4 bg-red-50 text-red-700 rounded-xl text-sm mb-6 border border-red-100">
+            <div className="flex items-center gap-2.5 p-4 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 rounded-xl text-sm mb-6 border border-red-100 dark:border-red-500/20">
               <AlertCircle size={16} className="flex-shrink-0" /> {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Full name</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Full name</label>
               <input type="text" value={form.name} onChange={e => update('name', e.target.value)}
                 placeholder="Your name" required minLength={2} maxLength={50} className="input-field" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email address</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Email address</label>
               <input type="email" value={form.email} onChange={e => update('email', e.target.value)}
                 placeholder="you@example.com" required className="input-field" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Password</label>
               <div className="relative">
                 <input type={showPw ? 'text' : 'password'} value={form.password}
                   onChange={e => update('password', e.target.value)}
@@ -157,12 +170,12 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          <p className="text-center text-xs text-gray-400 mt-6">
+          <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-6">
             By creating an account you agree to our{' '}
             <Link href="/terms" className="text-primary-600 hover:underline">Terms</Link> and{' '}
             <Link href="/privacy" className="text-primary-600 hover:underline">Privacy Policy</Link>
           </p>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
