@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 interface LogoProps {
@@ -19,14 +20,8 @@ const SIZES = {
 export function LogoIcon({ size = 'md', className }: { size?: LogoProps['size']; className?: string }) {
   const s = SIZES[size ?? 'md'];
   return (
-    <div className={cn(
-      'flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-700 shadow-sm flex-shrink-0',
-      s.box, className
-    )}>
-      <svg viewBox="0 0 24 24" fill="none" className="w-[55%] h-[55%]">
-        <path d="M5 12a7 7 0 1 1 7 7" stroke="white" strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-        <path d="M12 19 L9 15.5 L15 15.5 Z" fill="white"/>
-      </svg>
+    <div className={cn('flex-shrink-0', s.box, className)}>
+      <Image src="/logo.svg" alt="ReClaim" width={80} height={80} className="w-full h-full" priority />
     </div>
   );
 }
