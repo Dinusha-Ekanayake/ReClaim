@@ -93,10 +93,10 @@ export default function ChatPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-500">
       <Navbar />
-      <div className="pt-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex gap-6 h-[calc(100vh-120px)]">
+      <div className="pt-16 max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-0 sm:py-6">
+        <div className="flex gap-0 sm:gap-6 h-[calc(100dvh-64px)] sm:h-[calc(100vh-120px)]">
           {/* Sidebar - Chat List */}
-          <div className={cn('w-80 flex-shrink-0 card flex flex-col', id !== 'index' && 'hidden lg:flex')}>
+          <div className={cn('w-full lg:w-80 flex-shrink-0 card rounded-none sm:rounded-2xl flex flex-col', id !== 'index' && 'hidden lg:flex')}>
             <div className="p-4 border-b border-gray-100 dark:border-gray-800">
               <h2 className="font-display font-bold text-gray-900 dark:text-white">Messages</h2>
             </div>
@@ -155,7 +155,7 @@ export default function ChatPage() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 card flex flex-col min-w-0">
+            <div className="flex-1 card rounded-none sm:rounded-2xl flex flex-col min-w-0">
               {/* Chat header */}
               <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-800">
                 <button onClick={() => router.push('/chat')} className="lg:hidden p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300">

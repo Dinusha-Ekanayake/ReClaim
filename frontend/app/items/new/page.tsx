@@ -214,7 +214,7 @@ function NewItemPageContent() {
           ))}
         </div>
 
-        <div className="card p-8 space-y-6">
+        <div className="card p-5 sm:p-8 space-y-6">
           {step === 1 && (
             <>
               <div>

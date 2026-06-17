@@ -79,7 +79,7 @@ export default function EditItemPage() {
         <h1 className="text-3xl font-display font-bold text-gray-900 dark:text-white mb-2">Edit Item</h1>
         <p className="text-gray-500 dark:text-gray-400 mb-8 text-sm">Update your listing details</p>
 
-        <div className="card p-8 space-y-6">
+        <div className="card p-5 sm:p-8 space-y-6">
           {/* Title */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Title *</label>

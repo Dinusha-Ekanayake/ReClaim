@@ -53,7 +53,7 @@ export default function HeroSection() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50/40
                         dark:from-gray-950 dark:via-gray-950 dark:to-blue-950/30
-                        min-h-[620px] flex items-center transition-colors duration-500">
+                        min-h-[520px] lg:min-h-[620px] flex items-center transition-colors duration-500">
 
       {/* Background decorations */}
       <div className="absolute inset-0 pointer-events-none">
@@ -86,7 +86,7 @@ export default function HeroSection() {
 
             <motion.h1
               variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } } }}
-              className="text-5xl sm:text-6xl font-display font-extrabold text-gray-900 dark:text-white leading-[1.08] tracking-tight mb-5"
+              className="text-4xl sm:text-5xl lg:text-6xl font-display font-extrabold text-gray-900 dark:text-white leading-[1.08] tracking-tight mb-5"
             >
               Find what <span className="gradient-text">matters.</span>
               <br />
