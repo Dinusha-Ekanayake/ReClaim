@@ -24,7 +24,7 @@ ReClaim is a smart Lost & Found platform that connects people with their missing
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 14, React 18, Tailwind CSS, shadcn/ui (Radix UI) |
+| Frontend | Next.js (App Router), React 18, Tailwind CSS, shadcn/ui (Radix UI), Framer Motion |
 | State | Zustand |
 | Backend | Node.js, Express 4 |
 | Database | PostgreSQL via Prisma ORM (hosted on Supabase) |
