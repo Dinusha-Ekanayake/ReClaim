@@ -25,10 +25,22 @@ const errorHandler = (err, req, res, next) => {
     return res.status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
   }
 
-  // Default
+  // CORS rejection
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'Origin not allowed' });
+  }
+
+  // Default. For 5xx errors, never leak the raw internal message to clients in
+  // production — it can expose stack/DB internals. Client (4xx) errors are safe
+  // to surface because they are intentionally thrown with a user-facing message.
   const status = err.status || err.statusCode || 500;
+  const isServerError = status >= 500;
+  const message = isServerError && process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : (err.message || 'Internal server error');
+
   res.status(status).json({
-    error: err.message || 'Internal server error',
+    error: message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };

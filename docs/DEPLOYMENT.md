@@ -4,11 +4,19 @@
 
 | Service | Platform | Cost |
 |---------|----------|------|
-| Frontend | Vercel | Free |
-| Backend API | Render | Free (or $7/mo) |
-| Database | Supabase | Free |
+| Frontend | Vercel | Free (no card) |
+| Backend API | Render (free web service) | Free (no card) |
+| Database | Supabase | Free (no card) |
+| Keep-alive | GitHub Actions cron | Free |
 | Image Storage | Cloudinary | Free |
 | AI Matching | OpenAI | Pay-per-use (optional) |
+
+> **100% free, no card required.** Render's free *web service* runs indefinitely
+> — only Render's *database* product expires after ~30 days, and we don't use it
+> (the DB is Supabase). The one trade-off is that a free Render service sleeps
+> after ~15 min idle (≈50 s cold start on the next request). The included
+> GitHub Actions keep-alive (`.github/workflows/keep-alive.yml`) pings it every
+> ~14 min to avoid that **and** keeps Supabase from pausing.
 
 ---
 
@@ -38,18 +46,30 @@
 
 ---
 
-## 3. Backend — Render
+## 3. Backend — Render (free web service)
 
-1. Push your code to GitHub
-2. Go to [render.com](https://render.com) → New → Web Service
-3. Connect your GitHub repo
-4. Settings:
-   - **Root Directory**: `backend`
-   - **Build Command**: `npm install && npx prisma generate && npx prisma migrate deploy`
-   - **Start Command**: `npm start`
-   - **Environment**: Node
-5. Add all environment variables from `backend/.env.example`
-6. Deploy → copy the service URL (e.g. `https://reclaim-api.onrender.com`)
+This repo includes a `render.yaml` **Blueprint**, so the easiest path is:
+
+1. Push your code to GitHub.
+2. Go to [render.com](https://render.com) → **New → Blueprint** → pick this repo.
+3. Render reads `render.yaml` and pre-fills everything (root dir `backend`,
+   build/start commands, health check, free plan).
+4. Fill in the secret env vars it marks as required (the `sync: false` ones:
+   `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, Cloudinary
+   keys, `OPENAI_API_KEY`, and `FRONTEND_URL`).
+5. Deploy → copy the service URL (e.g. `https://reclaim-api.onrender.com`).
+
+**Manual setup (if you prefer not to use the Blueprint):**
+- **Root Directory**: `backend`
+- **Build Command**: `npm install && npx prisma generate`
+- **Start Command**: `npm start`
+- **Health Check Path**: `/api/health`
+
+> **Why no `prisma migrate deploy` in the build?** The schema is already applied
+> to your Supabase DB and the migration history isn't committed to git
+> (`prisma/migrations/` is gitignored). If you later commit migrations, add
+> `&& npx prisma migrate deploy` back to the build command. To apply schema
+> changes in the meantime, run `npx prisma db push` locally against Supabase.
 
 ---
 
@@ -59,7 +79,7 @@
 2. Import your GitHub repo
 3. Settings:
    - **Framework Preset**: Next.js
-   - **Root Directory**: `frontend`
+   - **Root Directory**: `frontend`  ← important: set this so Vercel builds the app, not the repo root
 4. Add environment variables:
    ```
    NEXT_PUBLIC_API_URL=https://reclaim-api.onrender.com/api
@@ -69,22 +89,37 @@
 
 ---
 
-## 5. Post-Deployment Checklist
+## 5. Keep-alive (prevents cold starts + DB pause) — free
+
+The repo ships `.github/workflows/keep-alive.yml`, which pings the backend every
+~14 min so the free Render service never sleeps and Supabase never pauses.
+
+1. In your GitHub repo: **Settings → Secrets and variables → Actions → Variables**.
+2. Add a **repository variable** named `BACKEND_URL` = your Render URL
+   (e.g. `https://reclaim-api.onrender.com`, no trailing slash).
+3. (Optional) Trigger it once manually: **Actions → Keep backend warm → Run workflow**.
+
+---
+
+## 6. Post-Deployment Checklist
 
 ```bash
-# Run database migrations on Render (via shell)
+# Seed the default admin (run once, from Render Shell or locally against Supabase)
 cd backend
-npx prisma migrate deploy
-node prisma/seed.js   # creates default admin
+node prisma/seed.js
 
 # Test the API health
 curl https://reclaim-api.onrender.com/api/health
 ```
 
+> No `prisma migrate deploy` here — the schema is already on Supabase. Use
+> `npx prisma db push` for future schema changes (see §3).
+
 ### Update CORS on backend
-In `backend/.env` on Render:
+Set `FRONTEND_URL` on Render to your Vercel URL. It accepts a **comma-separated
+list**, so include preview domains if you use them:
 ```
-FRONTEND_URL=https://your-project.vercel.app
+FRONTEND_URL=https://your-project.vercel.app,https://your-project-git-dev.vercel.app
 ```
 
 ### Change default admin password
@@ -96,7 +131,7 @@ FRONTEND_URL=https://your-project.vercel.app
 
 ---
 
-## 6. Custom Domain (Optional)
+## 7. Custom Domain (Optional)
 
 **Frontend (Vercel):**
 - Project Settings → Domains → Add your domain
@@ -108,11 +143,12 @@ FRONTEND_URL=https://your-project.vercel.app
 
 ---
 
-## 7. Environment Variables Reference
+## 8. Environment Variables Reference
 
 ### Backend (`backend/.env`)
 ```env
-DATABASE_URL=postgresql://...
+DATABASE_URL=postgresql://...   # Supabase pooled (Transaction) URL
+DIRECT_URL=postgresql://...     # Supabase direct URL (for migrations)
 JWT_SECRET=<64-char random string>
 JWT_REFRESH_SECRET=<64-char random string>
 JWT_EXPIRES_IN=15m
