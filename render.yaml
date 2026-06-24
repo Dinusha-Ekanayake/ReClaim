@@ -1,0 +1,46 @@
+# Render Blueprint — ReClaim backend (Express + Socket.io).
+# Free web services run indefinitely (they only sleep after ~15 min idle; the
+# keep-alive cron in .github/workflows keeps it warm). This is NOT a free
+# database — the DB stays on Supabase.
+#
+# Deploy: push to GitHub, then on render.com → New → Blueprint → pick this repo.
+services:
+  - type: web
+    name: reclaim-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    # prisma generate (not migrate) — the schema is already applied on Supabase,
+    # and migration history isn't committed. Run migrations manually if needed.
+    buildCommand: npm install && npx prisma generate
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Set the rest in the Render dashboard (marked sync:false so the blueprint
+      # never overwrites secret values you enter there).
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      # Your Vercel frontend URL(s), comma-separated. Update after first deploy.
+      - key: FRONTEND_URL
+        sync: false

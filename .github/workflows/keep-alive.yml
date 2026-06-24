@@ -1,0 +1,37 @@
+name: Keep backend warm
+
+# Pings the Render backend's health endpoint so the free web service doesn't
+# sleep after 15 min idle, and so Supabase doesn't pause from inactivity.
+#
+# Setup: add a repo variable named BACKEND_URL (Settings → Secrets and variables
+# → Actions → Variables) = your Render URL, e.g. https://reclaim-api.onrender.com
+#
+# Note: GitHub may skip scheduled runs on inactive repos and cron timing is
+# best-effort, but for a portfolio app a wake every ~14 min is plenty.
+
+on:
+  schedule:
+    - cron: '*/14 * * * *' # every 14 minutes
+  workflow_dispatch: {}     # allow manual runs
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          URL="${{ vars.BACKEND_URL }}"
+          if [ -z "$URL" ]; then
+            echo "BACKEND_URL repo variable is not set — skipping."
+            exit 0
+          fi
+          echo "Pinging $URL/api/health"
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$URL/api/health" || echo "000")
+          echo "HTTP $code"
+          # Don't fail the workflow on a cold-start timeout; the request still
+          # wakes the service, which is the whole point.
+          if [ "$code" = "200" ]; then
+            echo "Backend is awake."
+          else
+            echo "Got $code (likely waking from cold start) — that's fine."
+          fi

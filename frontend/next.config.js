@@ -1,5 +1,11 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Pin the workspace root to this folder so the build never mis-detects it
+  // (avoids the "inferred workspace root" warning when sibling lockfiles exist)
+  turbopack: { root: __dirname },
+  outputFileTracingRoot: path.join(__dirname),
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'res.cloudinary.com' },

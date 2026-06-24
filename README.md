@@ -24,7 +24,7 @@ ReClaim is a smart Lost & Found platform that connects people with their missing
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 14, React 18, Tailwind CSS, shadcn/ui (Radix UI) |
+| Frontend | Next.js (App Router), React 18, Tailwind CSS, shadcn/ui (Radix UI), Framer Motion |
 | State | Zustand |
 | Backend | Node.js, Express 4 |
 | Database | PostgreSQL via Prisma ORM (hosted on Supabase) |
@@ -196,13 +196,15 @@ vercel --prod
 
 Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` in the Vercel dashboard.
 
-### Backend → Render
+### Backend → Render (free)
 
-1. Connect your GitHub repo on [render.com](https://render.com)
-2. Set **Root Directory** to `backend`
-3. **Build command:** `npm install && npx prisma migrate deploy`
-4. **Start command:** `npm start`
-5. Add all backend environment variables
+The repo includes a `render.yaml` Blueprint — on [render.com](https://render.com)
+choose **New → Blueprint** and pick this repo; it pre-fills root dir, build/start
+commands, and the health check. Then fill in the secret env vars.
+
+A free GitHub Actions keep-alive (`.github/workflows/keep-alive.yml`) pings the
+backend every ~14 min so it never sleeps. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+for the full free-hosting guide (Vercel + Render-free + Supabase, no card required).
 
 ### Database → Supabase
 
