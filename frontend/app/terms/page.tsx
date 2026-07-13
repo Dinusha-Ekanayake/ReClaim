@@ -63,7 +63,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-3">8. Account Termination</h2>
-            <p>We reserve the right to suspend or terminate accounts that violate these Terms. You may delete your account at any time by contacting <a href="mailto:support@reclaim.app" className="text-primary-600 hover:underline">support@reclaim.app</a>.</p>
+            <p>We reserve the right to suspend or terminate accounts that violate these Terms. You may permanently delete your account from Dashboard Settings at any time.</p>
           </section>
 
           <section>

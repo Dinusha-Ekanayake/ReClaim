@@ -21,22 +21,18 @@ export function LogoIcon({ size = 'md', className }: { size?: LogoProps['size'];
   const s = SIZES[size ?? 'md'];
   return (
     <div className={cn('flex-shrink-0', s.box, className)}>
-      <Image src="/logo.svg" alt="ReClaim" width={80} height={80} className="w-full h-full" priority />
+      <Image src="/favicon.png" alt="" width={80} height={80} className="w-full h-full object-contain" priority />
     </div>
   );
 }
 
-export default function Logo({ size = 'md', href = '/', className, showText = true, textColor }: LogoProps) {
-  const s = SIZES[size];
-
+export default function Logo({ size = 'md', href = '/', className, showText = true }: LogoProps) {
   const inner = (
     <div className={cn('flex items-center gap-2.5 group', className)}>
-      <LogoIcon size={size} className="group-hover:scale-105 transition-transform duration-200" />
-      {showText && (
-        <span className={cn('font-display font-extrabold tracking-tight', s.text, textColor ?? 'text-gray-900')}>
-          Re<span className="text-primary-600">Claim</span>
-        </span>
-      )}
+      {showText ? (
+        <Image src="/logo.png" alt="ReClaim — Find what matters. Return what's lost." width={180} height={180}
+          className={cn('h-auto object-contain', size === 'sm' ? 'w-28' : size === 'md' ? 'w-32' : size === 'lg' ? 'w-40' : 'w-48')} priority />
+      ) : <LogoIcon size={size} className="group-hover:scale-105 transition-transform duration-200" />}
     </div>
   );
 

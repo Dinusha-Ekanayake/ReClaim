@@ -5,8 +5,8 @@ require('dotenv').config();
 const prisma = new PrismaClient();
 
 async function main() {
-  if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 12) {
-    throw new Error('ADMIN_PASSWORD must be set to a unique value with at least 12 characters');
+  if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 12 || Buffer.byteLength(process.env.ADMIN_PASSWORD, 'utf8') > 72) {
+    throw new Error('ADMIN_PASSWORD must be unique, at least 12 characters, and at most 72 bytes');
   }
 
   console.log('🌱 Seeding database...');

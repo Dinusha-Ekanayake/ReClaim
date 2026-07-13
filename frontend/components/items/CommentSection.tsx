@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Send, CornerDownRight, Trash2 } from 'lucide-react';
-import api from '@/lib/api';
+import { Send, CornerDownRight, Trash2, AlertCircle } from 'lucide-react';
+import api, { ApiError } from '@/lib/api';
 import { useAuthStore, useIsLoggedIn } from '@/lib/store/authStore';
 import { timeAgo, getAvatarFallback } from '@/lib/utils';
 
@@ -17,15 +17,21 @@ export default function CommentSection({ itemId }: CommentSectionProps) {
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get(`/comments/${itemId}`).then(setComments).catch(() => {});
+    setInitialLoading(true);
+    api.get(`/comments/${itemId}`).then(setComments)
+      .catch(err => setError(err instanceof ApiError ? err.message : 'Comments could not be loaded.'))
+      .finally(() => setInitialLoading(false));
   }, [itemId]);
 
   const submit = async (parentId?: string) => {
     const content = parentId ? replyText : text;
     if (!content.trim()) return;
     setLoading(true);
+    setError('');
     try {
       const comment = await api.post(`/comments/${itemId}`, { content, parentId });
       if (parentId) {
@@ -38,6 +44,8 @@ export default function CommentSection({ itemId }: CommentSectionProps) {
         setComments(prev => [comment, ...prev]);
         setText('');
       }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Comment could not be posted.');
     } finally {
       setLoading(false);
     }
@@ -53,7 +61,9 @@ export default function CommentSection({ itemId }: CommentSectionProps) {
       } else {
         setComments(prev => prev.filter(c => c.id !== commentId));
       }
-    } catch {}
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Comment could not be deleted.');
+    }
   };
 
   return (
@@ -71,9 +81,9 @@ export default function CommentSection({ itemId }: CommentSectionProps) {
           <div className="flex-1 flex gap-2">
             <input type="text" value={text} onChange={e => setText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && submit()}
-              placeholder="Leave a comment..."
+              placeholder="Leave a comment..." maxLength={1000} aria-label="Comment"
               className="input-field flex-1 text-sm" />
-            <button onClick={() => submit()} disabled={!text.trim() || loading}
+            <button onClick={() => submit()} disabled={!text.trim() || loading} aria-label="Post comment"
               className="btn-primary px-3 py-2 disabled:opacity-40">
               <Send size={16} />
             </button>
@@ -85,9 +95,13 @@ export default function CommentSection({ itemId }: CommentSectionProps) {
         </p>
       )}
 
+      {error && <div role="alert" className="mb-4 flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300"><AlertCircle size={16} className="mt-0.5 shrink-0" />{error}</div>}
+
       {/* Comments list */}
       <div className="space-y-5">
-        {comments.length === 0 && (
+        {initialLoading ? (
+          <div className="space-y-3">{[...Array(2)].map((_, index) => <div key={index} className="skeleton h-16 rounded-xl" />)}</div>
+        ) : comments.length === 0 && (
           <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-4">No comments yet. Be the first!</p>
         )}
         {comments.map(comment => (
@@ -101,9 +115,9 @@ export default function CommentSection({ itemId }: CommentSectionProps) {
               <div className="flex gap-2 mt-2 ml-10">
                 <input type="text" value={replyText} onChange={e => setReplyText(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && submit(comment.id)}
-                  placeholder="Write a reply..."
+                  placeholder="Write a reply..." maxLength={1000} aria-label={`Reply to ${comment.user?.name || 'comment'}`}
                   className="input-field flex-1 text-sm" autoFocus />
-                <button onClick={() => submit(comment.id)} disabled={!replyText.trim()}
+                <button onClick={() => submit(comment.id)} disabled={!replyText.trim() || loading}
                   className="btn-primary px-3 py-2 disabled:opacity-40 text-sm">
                   Reply
                 </button>

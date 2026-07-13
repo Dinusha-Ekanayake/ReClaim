@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Bell, Menu, X, Plus, Search, MessageSquare,
   LogOut, User, Settings, Shield, ChevronDown, LayoutDashboard,
@@ -13,19 +13,20 @@ import { cn, getAvatarFallback, timeAgo } from '@/lib/utils';
 import { LogoIcon } from '@/components/shared/Logo';
 import LanguageSelector from '@/components/shared/LanguageSelector';
 import ThemeToggle from '@/components/shared/ThemeToggle';
+import { useLanguage } from '@/components/providers/LanguageProvider';
 
 interface NavLink {
   href: string;
-  label: string;
+  labelKey: string;
   dot?: string;
   /** Exact `?type=` value this link represents, used for active matching. */
   type?: 'LOST' | 'FOUND';
 }
 
 const NAV_LINKS: NavLink[] = [
-  { href: '/items?type=LOST',  label: 'Lost Items',   dot: 'bg-red-500',     type: 'LOST' },
-  { href: '/items?type=FOUND', label: 'Found Items',  dot: 'bg-emerald-500', type: 'FOUND' },
-  { href: '/how-it-works',     label: 'How It Works' },
+  { href: '/items?type=LOST',  labelKey: 'nav.lost',       dot: 'bg-red-500',     type: 'LOST' },
+  { href: '/items?type=FOUND', labelKey: 'nav.found',      dot: 'bg-emerald-500', type: 'FOUND' },
+  { href: '/how-it-works',     labelKey: 'nav.howItWorks' },
 ];
 
 export default function Navbar() {
@@ -34,18 +35,18 @@ export default function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [scrolled,    setScrolled]    = useState(false);
   // Current ?type= query, read client-side so active state survives pathname-only updates
-  const [currentType, setCurrentType] = useState<string | null>(null);
-
   const notifRef   = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
   const router   = useRouter();
   const pathname = usePathname();
+  const currentType = useSearchParams().get('type');
+  const { t } = useLanguage();
   const user     = useAuthStore(s => s.user);
   const logout   = useAuthStore(s => s.logout);
   const isLoggedIn = useIsLoggedIn();
   const isAdmin    = useIsAdmin();
-  const { notifications, unreadCount, fetch: fetchNotifs, markRead, markAllRead } = useNotificationStore();
+  const { notifications, unreadCount, error: notificationError, fetch: fetchNotifs, markRead, markAllRead } = useNotificationStore();
 
   // ── Scroll shadow (set initial state too, not just on scroll) ──────────────
   useEffect(() => {
@@ -56,10 +57,6 @@ export default function Navbar() {
   }, []);
 
   // ── Track the current `?type=` query for active link matching ──────────────
-  useEffect(() => {
-    setCurrentType(new URLSearchParams(window.location.search).get('type'));
-  }, [pathname]);
-
   // ── Fetch notifications when logged in ─────────────────────────────────────
   useEffect(() => {
     if (isLoggedIn) fetchNotifs();
@@ -156,7 +153,7 @@ export default function Navbar() {
                     )}
                   >
                     {link.dot && <span className={`w-2 h-2 rounded-full ${link.dot}`} />}
-                    {link.label}
+                    {t(link.labelKey)}
                   </Link>
                 );
               })}
@@ -192,13 +189,13 @@ export default function Navbar() {
                                transition-all duration-200 shadow-sm hover:shadow-md ml-1"
                   >
                     <Plus size={15} strokeWidth={2.5} />
-                    Post Item
+                    {t('nav.postItem')}
                   </Link>
 
                   {/* Chat */}
                   <Link
                     href="/chat"
-                    aria-label="Messages"
+                    aria-label={t('nav.messages')}
                     className="hidden sm:flex p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800
                                rounded-lg transition-all duration-200 relative"
                   >
@@ -245,6 +242,12 @@ export default function Navbar() {
                             </button>
                           )}
                         </div>
+                        {notificationError && (
+                          <div role="alert" className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+                            <span>{notificationError}</span>
+                            <button type="button" onClick={fetchNotifs} className="font-bold underline">Retry</button>
+                          </div>
+                        )}
                         <div className="max-h-80 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-800">
                           {notifications.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-10 text-center">
@@ -338,7 +341,7 @@ export default function Navbar() {
                                          text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                             >
                               <span className="text-gray-400">{item.icon}</span>
-                              {item.label}
+                              {item.label === 'My Dashboard' ? t('nav.dashboard') : t('nav.settings')}
                             </Link>
                           ))}
                           {isAdmin && (
@@ -348,7 +351,7 @@ export default function Navbar() {
                               className="flex items-center gap-2.5 px-4 py-2.5 text-sm
                                          text-primary-600 dark:text-primary-400 font-medium hover:bg-blue-50 dark:hover:bg-primary-500/10 transition-colors"
                             >
-                              <Shield size={15} /> Admin Panel
+                              <Shield size={15} /> {t('nav.admin')}
                             </Link>
                           )}
                           <div className="mx-3 my-1 border-t border-gray-100 dark:border-gray-800" />
@@ -358,7 +361,7 @@ export default function Navbar() {
                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm
                                        text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                           >
-                            <LogOut size={15} /> Sign Out
+                            <LogOut size={15} /> {t('nav.signOut')}
                           </button>
                         </div>
                       </div>
@@ -373,7 +376,7 @@ export default function Navbar() {
                                hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800
                                transition-all duration-200"
                   >
-                    Sign In
+                    {t('nav.signIn')}
                   </Link>
                   <Link
                     href="/auth/register"
@@ -381,7 +384,7 @@ export default function Navbar() {
                                hover:bg-primary-700 active:scale-95
                                transition-all duration-200 shadow-sm hover:shadow-md"
                   >
-                    Sign Up
+                    {t('nav.signUp')}
                   </Link>
                 </div>
               )}
@@ -430,7 +433,7 @@ export default function Navbar() {
                     )}
                   >
                     {link.dot && <span className={`w-2 h-2 rounded-full ${link.dot}`} />}
-                    {link.label}
+                    {t(link.labelKey)}
                   </Link>
                 );
               })}
@@ -443,14 +446,14 @@ export default function Navbar() {
                     className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold
                                text-primary-600 dark:text-primary-400 hover:bg-blue-50 dark:hover:bg-primary-500/10 rounded-xl transition-colors"
                   >
-                    <Plus size={16} strokeWidth={2.5} /> Post an Item
+                    <Plus size={16} strokeWidth={2.5} /> {t('nav.postItem')}
                   </Link>
                   <Link
                     href="/chat"
                     className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium
                                text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors"
                   >
-                    <MessageSquare size={16} /> Messages
+                    <MessageSquare size={16} /> {t('nav.messages')}
                   </Link>
                   <Link
                     href="/dashboard/notifications"
@@ -469,7 +472,7 @@ export default function Navbar() {
                     className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium
                                text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors"
                   >
-                    <LayoutDashboard size={16} /> My Dashboard
+                    <LayoutDashboard size={16} /> {t('nav.dashboard')}
                   </Link>
                   {isAdmin && (
                     <Link
@@ -477,7 +480,7 @@ export default function Navbar() {
                       className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium
                                  text-primary-600 dark:text-primary-400 hover:bg-blue-50 dark:hover:bg-primary-500/10 rounded-xl transition-colors"
                     >
-                      <Shield size={16} /> Admin Panel
+                      <Shield size={16} /> {t('nav.admin')}
                     </Link>
                   )}
                   <button
@@ -486,7 +489,7 @@ export default function Navbar() {
                     className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium
                                text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
                   >
-                    <LogOut size={16} /> Sign Out
+                    <LogOut size={16} /> {t('nav.signOut')}
                   </button>
                 </>
               ) : (
@@ -497,14 +500,14 @@ export default function Navbar() {
                     className="block px-3 py-2.5 text-sm font-medium
                                text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors"
                   >
-                    Sign In
+                    {t('nav.signIn')}
                   </Link>
                   <Link
                     href="/auth/register"
                     className="block px-3 py-2.5 text-sm font-semibold
                                text-primary-600 dark:text-primary-400 hover:bg-blue-50 dark:hover:bg-primary-500/10 rounded-xl transition-colors"
                   >
-                    Create Account
+                    {t('nav.signUp')}
                   </Link>
                 </>
               )}

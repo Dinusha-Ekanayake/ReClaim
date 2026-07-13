@@ -16,16 +16,27 @@ export default function LanguageSelector() {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, []);
 
   return (
     <div className="relative" ref={ref}>
       <button
+        type="button"
         onClick={() => setOpen(!open)}
+        aria-label="Choose language"
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl
-                   text-gray-600 hover:text-gray-900 hover:bg-gray-100
+                   text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800
                    transition-all duration-200 text-sm font-medium">
         <Globe size={16} className="text-gray-400" />
         <span className="hidden sm:block">{current.flag} {current.native}</span>
@@ -34,16 +45,19 @@ export default function LanguageSelector() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-xl border border-gray-100
-                        z-50 overflow-hidden animate-fade-in">
+        <div role="menu" className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800
+                        z-50 overflow-hidden animate-fade-in p-1.5">
           {LOCALES.map(l => (
             <button key={l.code}
+              type="button"
+              role="menuitemradio"
+              aria-checked={locale === l.code}
               onClick={() => { setLocale(l.code as Locale); setOpen(false); }}
               className={cn(
-                'w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors',
+                'w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left rounded-xl transition-colors',
                 locale === l.code
-                  ? 'bg-primary-50 text-primary-700 font-semibold'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300 font-semibold'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
               )}>
               <span className="text-lg">{l.flag}</span>
               <div>

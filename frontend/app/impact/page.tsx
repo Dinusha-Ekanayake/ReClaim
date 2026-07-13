@@ -63,9 +63,12 @@ function ProgressBar({ label, value, max, color, icon }:
 export default function ImpactPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get('/stats').then(setStats).catch(() => {}).finally(() => setLoading(false));
+    api.get('/stats').then(setStats)
+      .catch(() => setError('Live community statistics are temporarily unavailable.'))
+      .finally(() => setLoading(false));
   }, []);
 
   const total    = stats?.items?.total    ?? 0;
@@ -80,6 +83,7 @@ export default function ImpactPage() {
 
   return (
     <PublicLayout>
+      {error && <div role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">{error}</div>}
       {/* ── Hero ──────────────────────────────────────────────────── */}
       <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-blue-900 text-white py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
@@ -90,7 +94,7 @@ export default function ImpactPage() {
             Real Stories.<br />Real Impact.
           </h1>
           <p className="text-blue-200 text-lg max-w-xl mx-auto leading-relaxed">
-            Every number here represents a person helped, a memory preserved, and a community made stronger.
+            Live totals from the ReClaim community, updated as members report and return items.
           </p>
         </div>
       </div>
@@ -100,9 +104,9 @@ export default function ImpactPage() {
         {/* ── Hero stats ─────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
           {[
-            { icon: <Package size={24} className="text-primary-600" />, label: 'Total Items', value: total, suffix: '+', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-100 dark:border-blue-500/20' },
-            { icon: <CheckCircle size={24} className="text-emerald-600" />, label: 'Items Returned', value: returned, suffix: '+', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-100 dark:border-emerald-500/20' },
-            { icon: <Users size={24} className="text-amber-600" />, label: 'Community Members', value: users, suffix: '+', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-100 dark:border-amber-500/20' },
+            { icon: <Package size={24} className="text-primary-600" />, label: 'Total Items', value: total, suffix: '', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-100 dark:border-blue-500/20' },
+            { icon: <CheckCircle size={24} className="text-emerald-600" />, label: 'Items Returned', value: returned, suffix: '', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-100 dark:border-emerald-500/20' },
+            { icon: <Users size={24} className="text-amber-600" />, label: 'Community Members', value: users, suffix: '', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-100 dark:border-amber-500/20' },
             { icon: <Award size={24} className="text-purple-600" />, label: 'Success Rate', value: rate, suffix: '%', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-100 dark:border-purple-500/20' },
           ].map(s => (
             <div key={s.label}

@@ -15,6 +15,7 @@ interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
   isLoading: boolean;
+  error: string | null;
   fetch: () => Promise<void>;
   markRead: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
@@ -25,33 +26,44 @@ export const useNotificationStore = create<NotificationState>((set) => ({
   notifications: [],
   unreadCount: 0,
   isLoading: false,
+  error: null,
 
   fetch: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     try {
       const data = await api.get('/notifications', { limit: 30 });
-      set({ notifications: data.notifications, unreadCount: data.unreadCount, isLoading: false });
+      set({ notifications: data.notifications, unreadCount: data.unreadCount, isLoading: false, error: null });
     } catch {
-      set({ isLoading: false });
+      set({ isLoading: false, error: 'Could not load notifications.' });
     }
   },
 
   markRead: async (id) => {
     const current = useNotificationStore.getState().notifications.find(n => n.id === id);
     if (!current || current.isRead) return;
-    await api.patch(`/notifications/${id}/read`);
-    set(s => ({
-      notifications: s.notifications.map(n => n.id === id ? { ...n, isRead: true } : n),
-      unreadCount: Math.max(0, s.unreadCount - 1),
-    }));
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      set(s => ({
+        notifications: s.notifications.map(n => n.id === id ? { ...n, isRead: true } : n),
+        unreadCount: Math.max(0, s.unreadCount - 1),
+        error: null,
+      }));
+    } catch {
+      set({ error: 'Could not update the notification.' });
+    }
   },
 
   markAllRead: async () => {
-    await api.patch('/notifications/read-all');
-    set(s => ({
-      notifications: s.notifications.map(n => ({ ...n, isRead: true })),
-      unreadCount: 0,
-    }));
+    try {
+      await api.patch('/notifications/read-all');
+      set(s => ({
+        notifications: s.notifications.map(n => ({ ...n, isRead: true })),
+        unreadCount: 0,
+        error: null,
+      }));
+    } catch {
+      set({ error: 'Could not mark notifications as read.' });
+    }
   },
 
   addNew: (n) => {

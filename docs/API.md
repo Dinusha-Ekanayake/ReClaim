@@ -11,6 +11,8 @@ Protected routes accept the HttpOnly access cookie used by the web app or `Autho
 |--------|----------|------|-------------|
 | POST | `/auth/register` | No | Register new user |
 | POST | `/auth/login` | No | Login, returns tokens |
+| POST | `/auth/forgot-password` | No | Request a single-use reset link |
+| POST | `/auth/reset-password` | No | Reset password and revoke active sessions |
 | POST | `/auth/refresh` | No | Refresh access token |
 | POST | `/auth/logout` | Cookie/Bearer optional | Logout + invalidate refresh token |
 | GET | `/auth/me` | Yes | Get current user profile |
@@ -179,10 +181,10 @@ Reason options: `FAKE | INAPPROPRIATE | SPAM | WRONG_CATEGORY | OTHER`
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | POST | `/upload/images` | Yes | Upload up to 5 item images (multipart) |
-| POST | `/upload/avatar` | Yes | Upload profile avatar (multipart) |
+| DELETE | `/upload/images` | Yes | Clean up unattached uploads using signed receipts |
 
-Form field name: `images` (array) or `avatar`  
-Response: `{ images: [{ url, publicId }] }`
+Form field name: `images` (array).
+Response: `{ images: [{ url, publicId, uploadToken }] }`. The signed upload token must accompany the image fields when creating an item.
 
 ---
 
@@ -192,8 +194,29 @@ Response: `{ images: [{ url, publicId }] }`
 |--------|----------|------|-------------|
 | GET | `/users/:id` | No | Public profile |
 | GET | `/users/:id/items` | No | User's public items |
+| GET | `/users/me/dashboard` | Yes | Current user's exact dashboard totals and recent items |
+| GET | `/users/me/items` | Yes | Paginated private owner item list |
 | PATCH | `/users/me` | Yes | Update profile |
 | POST | `/users/me/avatar` | Yes | Upload avatar |
+| DELETE | `/users/me` | Yes | Permanently delete a regular user account |
+
+---
+
+## Contact
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/contact` | No | Submit a validated support message |
+
+---
+
+## Health and statistics
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/health` | No | Process liveness |
+| GET | `/health/ready` | No | Application readiness including database connectivity |
+| GET | `/stats` | No | Live public community statistics |
 
 ---
 
@@ -210,3 +233,5 @@ Response: `{ images: [{ url, publicId }] }`
 | DELETE | `/admin/items/:id` | Hard delete item |
 | GET | `/admin/reports` | List reports |
 | PATCH | `/admin/reports/:id` | Resolve / dismiss report |
+| GET | `/admin/contacts` | Paginated support inbox |
+| PATCH | `/admin/contacts/:id` | Update support-message status or internal note |

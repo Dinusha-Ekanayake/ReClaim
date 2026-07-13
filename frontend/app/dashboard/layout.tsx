@@ -29,7 +29,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!isLoggedIn) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-500">
+    <div className="min-h-screen bg-gray-50/80 dark:bg-gray-950/85 backdrop-blur-[2px] transition-colors duration-500">
       <Navbar />
 
       {/* ── Mobile tab bar (horizontal scroll) ─────────────────── */}

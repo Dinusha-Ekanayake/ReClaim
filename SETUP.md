@@ -154,22 +154,15 @@ Supabase free-tier projects pause after **7 days of inactivity**. To prevent thi
 1. Sign up at [cloudinary.com](https://cloudinary.com)
 2. Go to your **Dashboard** → note your **Cloud Name**, **API Key**, and **API Secret**
 
-### Create an upload preset
-
-1. **Settings** → **Upload** → **Upload presets** → **Add upload preset**
-2. Set **Signing Mode** to `Unsigned`
-3. Set a folder name, e.g. `reclaim`
-4. Save — copy the **preset name**
-
 ### Environment variables
 
 ```env
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
-NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your_preset_name
 ```
+
+Uploads are sent through the authenticated backend and signed server-side. Do not create an unsigned upload preset or expose the API secret to the frontend.
 
 ### Allow Cloudinary in Next.js image domains
 
@@ -216,6 +209,7 @@ PORT=5000
 
 # ── Database ─────────────────────────────────────────
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/postgres"
+DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/postgres"
 
 # ── Authentication ────────────────────────────────────
 # Generate strong secrets: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
@@ -228,6 +222,8 @@ JWT_REFRESH_EXPIRES_IN=7d
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+RESEND_API_KEY=re_...
+EMAIL_FROM=ReClaim <no-reply@your-domain.com>
 
 # ── OpenAI (optional) ─────────────────────────────────
 OPENAI_API_KEY=sk-...
@@ -241,10 +237,10 @@ FRONTEND_URL=https://your-app.vercel.app
 ```env
 # ── API ───────────────────────────────────────────────
 NEXT_PUBLIC_API_URL=https://your-api.onrender.com/api
+NEXT_PUBLIC_SOCKET_URL=https://your-api.onrender.com
+NEXT_PUBLIC_SITE_URL=https://your-app.vercel.app
 
 # ── Cloudinary (public — safe to expose) ─────────────
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
-NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your_preset_name
 ```
 
 > **Never** commit `.env` or `.env.local` files to Git.  
@@ -298,9 +294,9 @@ npx vercel --prod
 2. Set **Root Directory** to `frontend`
 3. Vercel auto-detects Next.js — no build command needed
 4. Add environment variables:
-   - `NEXT_PUBLIC_API_URL` → your Render backend URL
-   - `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` → your cloud name
-   - `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` → your preset name
+   - `NEXT_PUBLIC_API_URL` → your Render backend URL with `/api`
+   - `NEXT_PUBLIC_SOCKET_URL` → your Render backend origin
+   - `NEXT_PUBLIC_SITE_URL` → your canonical frontend origin
 
 ### Custom domain
 

@@ -61,7 +61,7 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-6 space-y-1 mt-2">
               <li>Update your profile information in <Link href="/dashboard/settings" className="text-primary-600 hover:underline">Settings</Link></li>
               <li>Delete your items from your dashboard</li>
-              <li>Request account deletion by emailing <a href="mailto:privacy@reclaim.app" className="text-primary-600 hover:underline">privacy@reclaim.app</a></li>
+                <li>Permanently delete your account and associated data from <Link href="/dashboard/settings" className="text-primary-600 hover:underline">Settings</Link></li>
             </ul>
           </section>
 

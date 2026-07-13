@@ -15,7 +15,7 @@ const BENEFITS = [
   '✓  AI-powered match notifications',
   '✓  Secure real-time chat',
   '✓  Verified ownership claim system',
-  '✓  100% free — forever',
+  '✓  No payment required to participate',
 ];
 
 export default function RegisterPage() {
@@ -34,6 +34,7 @@ export default function RegisterPage() {
     { label: 'Uppercase letter', ok: /[A-Z]/.test(form.password) },
     { label: 'Lowercase letter', ok: /[a-z]/.test(form.password) },
     { label: 'Number',           ok: /\d/.test(form.password) },
+    { label: '72 bytes or fewer', ok: new TextEncoder().encode(form.password).length <= 72 },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,8 +89,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="mt-10 p-5 bg-white/10 border border-white/20 rounded-2xl text-sm text-emerald-100">
-            &ldquo;ReClaim helped me get my wallet back within hours. The AI matching is incredible!&rdquo;
-            <div className="mt-2 text-xs text-emerald-300 font-semibold">— Kasun P., Colombo</div>
+            Keep identifying details private when posting a found item. ReClaim uses them later to verify the rightful owner.
           </div>
         </motion.div>
       </div>
@@ -136,8 +136,9 @@ export default function RegisterPage() {
               <div className="relative">
                 <input type={showPw ? 'text' : 'password'} value={form.password}
                   onChange={e => update('password', e.target.value)}
-                  placeholder="Create a strong password" required className="input-field pr-11" />
+                  placeholder="Create a strong password" required maxLength={72} autoComplete="new-password" className="input-field pr-11" />
                 <button type="button" onClick={() => setShowPw(!showPw)}
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
                   {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>

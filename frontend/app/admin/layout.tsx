@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, Package, Flag, Shield,
-  LogOut, MessageSquare, Menu, X,
+  LogOut, MessageSquare, Menu, X, Inbox,
 } from 'lucide-react';
 import { useAuthStore, useIsAdmin } from '@/lib/store/authStore';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ const NAV = [
   { href: '/admin/items', label: 'Items', icon: Package },
   { href: '/admin/reports', label: 'Reports', icon: Flag },
   { href: '/admin/claims', label: 'Claims', icon: MessageSquare },
+  { href: '/admin/contacts', label: 'Contact Inbox', icon: Inbox },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -112,7 +113,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 
   return (
-    <div className="min-h-screen bg-gray-950 lg:flex">
+    <div className="min-h-screen bg-gray-950/90 backdrop-blur-[2px] lg:flex">
       {/* ── Mobile top bar ─────────────────────────────────────── */}
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 bg-gray-950/95 backdrop-blur border-b border-gray-800">
         <Link href="/admin" className="flex items-center gap-2">

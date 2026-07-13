@@ -12,6 +12,7 @@ interface User {
   bio?: string;
   location?: string;
   isVerified?: boolean;
+  createdAt?: string;
 }
 
 interface AuthState {
@@ -24,6 +25,7 @@ interface AuthState {
   logout: () => Promise<void>;
   initialize: () => Promise<void>;
   updateUser: (data: Partial<User>) => void;
+  clearSession: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -84,6 +86,12 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   updateUser: (data) => {
     set(state => ({ user: state.user ? { ...state.user, ...data } : null }));
+  },
+
+  clearSession: () => {
+    localStorage.removeItem('hasSession');
+    setAccessToken(null);
+    set({ user: null });
   },
 }));
 

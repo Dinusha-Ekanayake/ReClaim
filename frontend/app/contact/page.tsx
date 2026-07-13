@@ -1,22 +1,31 @@
 'use client';
 import { useState } from 'react';
 import PublicLayout from '@/components/layout/PublicLayout';
-import { Mail, MessageSquare, MapPin, Send, CheckCircle } from 'lucide-react';
+import { Mail, MessageSquare, MapPin, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import api, { ApiError } from '@/lib/api';
 
 export default function ContactPage() {
-  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
+  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '', website: '' });
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [reference, setReference] = useState('');
 
   const update = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Simulate send (replace with real API call if needed)
-    await new Promise(r => setTimeout(r, 1200));
-    setSent(true);
-    setLoading(false);
+    setError('');
+    try {
+      const data = await api.post('/contact', form);
+      setReference(data.reference || '');
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Your message could not be sent. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -57,7 +66,7 @@ export default function ContactPage() {
 
             <div className="p-5 bg-primary-50 dark:bg-primary-500/10 rounded-2xl border border-primary-100 dark:border-primary-500/20">
               <p className="text-sm font-semibold text-primary-800 dark:text-primary-300 mb-1">Response time</p>
-              <p className="text-sm text-primary-700 dark:text-primary-400">We typically respond within 24–48 hours on business days.</p>
+              <p className="text-sm text-primary-700 dark:text-primary-400">Your message is securely added to the ReClaim support inbox for review.</p>
             </div>
           </div>
 
@@ -71,35 +80,46 @@ export default function ContactPage() {
                 </div>
                 <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-2">Message sent!</h3>
                 <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs">
-                  Thanks for reaching out. We&apos;ll get back to you within 24–48 hours.
+                  Thanks for reaching out. The support team can now review your message.
                 </p>
+                {reference && <p className="mt-3 text-xs font-mono text-gray-400">Reference: {reference}</p>}
               </div>
             ) : (
               <form onSubmit={handleSubmit}
-                className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-8 space-y-5">
+                className="relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-8 space-y-5">
+                <div className="absolute -left-[9999px]" aria-hidden="true">
+                  <label htmlFor="website">Website</label>
+                  <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off"
+                    value={form.website} onChange={e => update('website', e.target.value)} />
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Name</label>
                     <input type="text" value={form.name} onChange={e => update('name', e.target.value)}
-                      placeholder="Your name" required className="input-field" />
+                      placeholder="Your name" required minLength={2} maxLength={80} autoComplete="name" className="input-field" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
                     <input type="email" value={form.email} onChange={e => update('email', e.target.value)}
-                      placeholder="you@example.com" required className="input-field" />
+                      placeholder="you@example.com" required maxLength={254} autoComplete="email" className="input-field" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Subject</label>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Subject</label>
                   <input type="text" value={form.subject} onChange={e => update('subject', e.target.value)}
-                    placeholder="What's this about?" required className="input-field" />
+                    placeholder="What's this about?" required minLength={3} maxLength={120} className="input-field" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Message</label>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Message</label>
                   <textarea value={form.message} onChange={e => update('message', e.target.value)}
-                    placeholder="Tell us more…" required rows={5}
+                    placeholder="Tell us more…" required minLength={10} maxLength={3000} rows={5}
                     className="input-field resize-none" />
                 </div>
+                {error && (
+                  <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                    <AlertCircle size={17} className="mt-0.5 shrink-0" /> {error}
+                  </div>
+                )}
                 <button type="submit" disabled={loading}
                   className="w-full btn-primary py-3 flex items-center justify-center gap-2">
                   {loading ? (

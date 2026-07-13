@@ -56,14 +56,14 @@ This repo includes a `render.yaml` **Blueprint**, so the easiest path is:
    build/start commands, health check, free plan).
 4. Fill in the secret env vars it marks as required (the `sync: false` ones:
    `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, Cloudinary
-   keys, `OPENAI_API_KEY`, and `FRONTEND_URL`).
+   keys, `RESEND_API_KEY`, `EMAIL_FROM`, `OPENAI_API_KEY`, and `FRONTEND_URL`).
 5. Deploy → copy the service URL (e.g. `https://reclaim-api.onrender.com`).
 
 **Manual setup (if you prefer not to use the Blueprint):**
 - **Root Directory**: `backend`
 - **Build Command**: `npm ci && npx prisma generate && npx prisma migrate deploy`
 - **Start Command**: `npm start`
-- **Health Check Path**: `/api/health`
+- **Health Check Path**: `/api/health/ready`
 
 > Keep production schema changes in committed Prisma migrations. Do not use
 > `prisma db push` against production because it bypasses migration history.
@@ -81,6 +81,7 @@ This repo includes a `render.yaml` **Blueprint**, so the easiest path is:
    ```
    NEXT_PUBLIC_API_URL=https://reclaim-api.onrender.com/api
    NEXT_PUBLIC_SOCKET_URL=https://reclaim-api.onrender.com
+   NEXT_PUBLIC_SITE_URL=https://your-project.vercel.app
    ```
 5. Deploy → your site is live!
 
@@ -154,6 +155,8 @@ CLOUDINARY_CLOUD_NAME=...
 CLOUDINARY_API_KEY=...
 CLOUDINARY_API_SECRET=...
 OPENAI_API_KEY=sk-...       # optional
+RESEND_API_KEY=re_...
+EMAIL_FROM=ReClaim <no-reply@your-domain.com>
 PORT=5000
 NODE_ENV=production
 FRONTEND_URL=https://your-project.vercel.app
@@ -166,6 +169,7 @@ ADMIN_NAME=ReClaim Admin
 ```env
 NEXT_PUBLIC_API_URL=https://reclaim-api.onrender.com/api
 NEXT_PUBLIC_SOCKET_URL=https://reclaim-api.onrender.com
+NEXT_PUBLIC_SITE_URL=https://your-project.vercel.app
 ```
 
 ---

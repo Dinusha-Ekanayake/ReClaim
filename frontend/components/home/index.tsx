@@ -6,6 +6,7 @@ import api from '@/lib/api';
 import ItemCard from '@/components/items/ItemCard';
 import { Reveal } from '@/components/shared/motion';
 import { CATEGORIES } from '@/lib/utils';
+import { useLanguage } from '@/components/providers/LanguageProvider';
 
 // ─── Animated counter hook ────────────────────────────────────────────────────
 function useCountUp(target: number, duration = 1400, start = false) {
@@ -41,11 +42,11 @@ function useInView(threshold = 0.2) {
 }
 
 // ─── Stats Section ────────────────────────────────────────────────────────────
-function StatCard({ icon, rawValue, numValue, label, bg, delay }:
-  { icon: React.ReactNode; rawValue: string; numValue: number; label: string; bg: string; delay: string }) {
+function StatCard({ icon, numValue, suffix = '', label, bg, delay, loading }:
+  { icon: React.ReactNode; numValue: number; suffix?: string; label: string; bg: string; delay: string; loading: boolean }) {
   const { ref, inView } = useInView();
   const count = useCountUp(numValue, 1600, inView);
-  const displayValue = numValue > 0 ? (rawValue.includes('+') ? `${count.toLocaleString()}+` : `< ${count}`) : rawValue;
+  const displayValue = loading ? '—' : `${count.toLocaleString()}${suffix}`;
 
   return (
     <div ref={ref}
@@ -66,41 +67,40 @@ function StatCard({ icon, rawValue, numValue, label, bg, delay }:
 
 export function StatsSection() {
   const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const { t } = useLanguage();
 
   useEffect(() => {
-    api.get('/stats').then(setData).catch(() => {});
+    api.get('/stats').then(setData).catch(() => setData(null)).finally(() => setLoading(false));
   }, []);
 
   const stats = [
     {
       icon: <Search className="text-primary-600" size={26} />,
-      rawValue: data ? `${(data.items?.total ?? 0).toLocaleString()}+` : '—',
       numValue: data?.items?.total ?? 0,
-      label: 'Items Reported',
+      label: t('stats.reported'),
       bg: 'bg-blue-50 dark:bg-blue-500/10',
       delay: '0s',
     },
     {
       icon: <CheckCircle className="text-emerald-500" size={26} />,
-      rawValue: data ? `${(data.items?.returned ?? 0).toLocaleString()}+` : '—',
       numValue: data?.items?.returned ?? 0,
-      label: 'Items Returned',
+      label: t('stats.returned'),
       bg: 'bg-emerald-50 dark:bg-emerald-500/10',
       delay: '0.1s',
     },
     {
       icon: <Users className="text-amber-500" size={26} />,
-      rawValue: data ? `${(data.users?.total ?? 0).toLocaleString()}+` : '—',
       numValue: data?.users?.total ?? 0,
-      label: 'Registered Users',
+      label: t('stats.users'),
       bg: 'bg-amber-50 dark:bg-amber-500/10',
       delay: '0.2s',
     },
     {
       icon: <Zap className="text-purple-500" size={26} />,
-      rawValue: data ? `${data.successRate ?? 0}%` : '—',
       numValue: data?.successRate ?? 0,
-      label: 'Success Rate',
+      suffix: '%',
+      label: t('stats.successRate'),
       bg: 'bg-purple-50 dark:bg-purple-500/10',
       delay: '0.3s',
     },
@@ -110,7 +110,7 @@ export function StatsSection() {
     <section className="py-16 bg-white dark:bg-gray-950 transition-colors duration-500">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map(s => <StatCard key={s.label} {...s} />)}
+          {stats.map(s => <StatCard key={s.label} {...s} loading={loading} />)}
         </div>
       </div>
     </section>
@@ -120,12 +120,13 @@ export function StatsSection() {
 // ─── How It Works ─────────────────────────────────────────────────────────────
 export function HowItWorks() {
   const { ref, inView } = useInView(0.1);
+  const { t } = useLanguage();
 
   const steps = [
     {
       step: '01', emoji: '📝',
       icon: <Search size={26} />,
-      title: 'Post or Search',
+      title: t('hiw.step1.title'),
       desc: 'Report your lost item or post something you found. Add photos, describe it clearly, and pin the location on a map.',
       color: 'text-primary-600',
       bg: 'bg-blue-50',
@@ -135,7 +136,7 @@ export function HowItWorks() {
     {
       step: '02', emoji: '🤖',
       icon: <Zap size={26} />,
-      title: 'AI Smart Match',
+      title: t('hiw.step2.title'),
       desc: 'Our algorithm scores lost/found pairs by category, keywords, GPS location, date, and AI semantic embeddings.',
       color: 'text-emerald-600',
       bg: 'bg-emerald-50',
@@ -145,7 +146,7 @@ export function HowItWorks() {
     {
       step: '03', emoji: '💬',
       icon: <MessageSquare size={26} />,
-      title: 'Connect & Verify',
+      title: t('hiw.step3.title'),
       desc: 'Chat securely inside ReClaim. Claimants answer hidden verification questions only the true owner would know.',
       color: 'text-amber-600',
       bg: 'bg-amber-50',
@@ -155,7 +156,7 @@ export function HowItWorks() {
     {
       step: '04', emoji: '🎉',
       icon: <CheckCircle size={26} />,
-      title: 'Reunited!',
+      title: t('hiw.step4.title'),
       desc: 'Approve the claim, arrange the handover, and mark the item returned. Another happy reunion for the community.',
       color: 'text-purple-600',
       bg: 'bg-purple-50',
@@ -177,11 +178,11 @@ export function HowItWorks() {
           </div>
           <h2 className={`text-4xl sm:text-5xl font-display font-extrabold text-gray-900 dark:text-white mb-4
                           ${inView ? 'animate-fade-in-up' : 'opacity-0'}`}>
-            Four steps to a reunion
+            {t('hiw.title')}
           </h2>
           <p className={`text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto
                         ${inView ? 'animate-fade-in-up animate-delay-100' : 'opacity-0'}`}>
-            Simple. Secure. Smart.
+            {t('hiw.subtitle')}
           </p>
         </div>
 
@@ -304,6 +305,7 @@ export function RecentItems() {
   const [lostItems, setLostItems]   = useState<any[]>([]);
   const [foundItems, setFoundItems] = useState<any[]>([]);
   const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -312,7 +314,8 @@ export function RecentItems() {
     ]).then(([l, f]) => {
       setLostItems(l.items);
       setFoundItems(f.items);
-    }).finally(() => setLoading(false));
+    }).catch(() => setError('Recent reports are temporarily unavailable.'))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -327,6 +330,8 @@ export function RecentItems() {
           </h2>
           <p className="text-gray-500 dark:text-gray-400">See the latest lost and found items near you</p>
         </Reveal>
+
+        {error && <div role="status" className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">{error}</div>}
 
         {/* Lost */}
         <ItemGroup
@@ -403,6 +408,7 @@ function SkeletonCard() {
 // ─── CTA Section ──────────────────────────────────────────────────────────────
 export function CTASection() {
   const { ref, inView } = useInView(0.2);
+  const { t } = useLanguage();
 
   return (
     <section ref={ref}
@@ -427,14 +433,13 @@ export function CTASection() {
         <h2 className={`text-4xl sm:text-5xl lg:text-6xl font-display font-extrabold
                         text-white mb-6 leading-tight
                         ${inView ? 'animate-fade-in-up animate-delay-100' : 'opacity-0'}`}>
-          Lost something<br />
-          <span className="text-blue-200">valuable?</span>
+          {t('cta.h2')}
         </h2>
 
         <p className={`text-lg text-blue-100 mb-12 max-w-xl mx-auto leading-relaxed
                        ${inView ? 'animate-fade-in-up animate-delay-200' : 'opacity-0'}`}>
           Post your lost item now and let our smart matching system work for you.
-          Takes under 2 minutes. Free forever.
+          {t('cta.sub')}
         </p>
 
         {/* CTA buttons */}
@@ -447,7 +452,7 @@ export function CTASection() {
                        shadow-xl shadow-black/20 overflow-hidden">
             <span className="absolute inset-0 animate-shimmer opacity-0 group-hover:opacity-100 transition-opacity" />
             <span className="text-xl">🔍</span>
-            Report Lost Item
+            {t('cta.lost')}
           </Link>
           <Link href="/items/new?type=FOUND"
             className="inline-flex items-center justify-center gap-2.5
@@ -455,14 +460,14 @@ export function CTASection() {
                        border-2 border-white/30 backdrop-blur-sm
                        hover:bg-white/25 active:scale-95 transition-all duration-200">
             <span className="text-xl">📦</span>
-            Post Found Item
+            {t('cta.found')}
           </Link>
         </div>
 
         {/* Reassurance line */}
         <p className={`mt-8 text-xs text-blue-200/70 font-medium
                       ${inView ? 'animate-fade-in-up animate-delay-400' : 'opacity-0'}`}>
-          No credit card required · Free for everyone · Moderated community
+          No payment required · Secure verification · Moderated community
         </p>
       </div>
     </section>

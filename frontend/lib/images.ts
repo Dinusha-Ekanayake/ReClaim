@@ -24,8 +24,6 @@ export const IMAGES = {
   // CTA / banners
   community: U('photo-1529156069898-49953e39b3ac', 1400, 700),    // community crowd
 
-  // Generic placeholder for items with no photo
-  placeholder: U('photo-1586023492125-27b2c045efd7', 600, 400),
 };
 
 // Build a deterministic Unsplash mood image per category for cards without photos

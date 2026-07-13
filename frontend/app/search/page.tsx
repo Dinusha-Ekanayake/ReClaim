@@ -25,12 +25,14 @@ function SearchPageContent() {
   const [items, setItems] = useState<any[]>([]);
   const [pagination, setPagination] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const debouncedQuery = useDebounce(query, 400);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
+    setError('');
     const params: Record<string, any> = { page, limit: 12, order: 'desc' };
     if (debouncedQuery) params.search = debouncedQuery;
     if (type) params.type = type;
@@ -39,7 +41,13 @@ function SearchPageContent() {
 
     api.get('/items', params, { signal: controller.signal })
       .then(data => { setItems(data.items); setPagination(data.pagination); })
-      .catch((error) => { if (error.name !== 'AbortError') setItems([]); })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') {
+          setItems([]);
+          setPagination(null);
+          setError(requestError.message || 'Search is temporarily unavailable.');
+        }
+      })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [debouncedQuery, type, category, color, page]);
@@ -116,6 +124,12 @@ function SearchPageContent() {
             </span>
           )}
         </div>
+
+        {error && (
+          <div role="alert" className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+            {error}
+          </div>
+        )}
 
         {/* Results */}
         {loading ? (

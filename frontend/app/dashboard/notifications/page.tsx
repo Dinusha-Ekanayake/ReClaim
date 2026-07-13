@@ -18,7 +18,7 @@ const TYPE_ICONS: Record<string, string> = {
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const { notifications, unreadCount, isLoading, fetch, markRead, markAllRead } = useNotificationStore();
+  const { notifications, unreadCount, isLoading, error, fetch, markRead, markAllRead } = useNotificationStore();
 
   useEffect(() => { fetch(); }, []);
 
@@ -36,6 +36,13 @@ export default function NotificationsPage() {
           </button>
         )}
       </div>
+
+      {error && (
+        <div role="alert" className="flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+          <span>{error}</span>
+          <button type="button" onClick={fetch} className="font-bold underline">Retry</button>
+        </div>
+      )}
 
       <div className="card divide-y divide-gray-50 dark:divide-gray-800">
         {isLoading ? (

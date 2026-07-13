@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { Search, Ban, CheckCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { cn, timeAgo, getAvatarFallback } from '@/lib/utils';
+import { toast } from '@/components/ui/toaster';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -21,6 +22,8 @@ export default function AdminUsersPage() {
       const data = await api.get('/admin/users', { search, page, limit: 20 });
       setUsers(data.users);
       setTotal(data.total);
+    } catch (error: any) {
+      toast({ title: 'Could not load users', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -29,15 +32,21 @@ export default function AdminUsersPage() {
   useEffect(() => { fetchUsers(); }, [search, page]);
 
   const handleBanToggle = async (user: any) => {
+    if (!user.isBanned && !banReason.trim()) {
+      toast({ title: 'Ban reason required', description: 'Provide a clear moderation reason before banning this user.', variant: 'destructive' });
+      return;
+    }
     setProcessing(true);
     try {
       const updated = await api.patch(`/admin/users/${user.id}/ban`, {
         isBanned: !user.isBanned,
-        banReason: !user.isBanned ? (banReason || 'Banned by admin') : null,
+        banReason: !user.isBanned ? banReason.trim() : null,
       });
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, ...updated } : u));
       setActionUser(null);
       setBanReason('');
+    } catch (error: any) {
+      toast({ title: 'Could not update user', description: error.message, variant: 'destructive' });
     } finally {
       setProcessing(false);
     }
@@ -47,7 +56,9 @@ export default function AdminUsersPage() {
     try {
       const updated = await api.patch(`/admin/users/${userId}/role`, { role });
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: updated.role } : u));
-    } catch {}
+    } catch (error: any) {
+      toast({ title: 'Could not change role', description: error.message, variant: 'destructive' });
+    }
   };
 
   return (
@@ -184,7 +195,8 @@ export default function AdminUsersPage() {
             </p>
             {!actionUser.isBanned && (
               <textarea value={banReason} onChange={e => setBanReason(e.target.value)}
-                placeholder="Reason for ban (optional)"
+                placeholder="Reason for ban (required)"
+                required maxLength={500}
                 rows={3}
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-500 resize-none mb-4" />
             )}

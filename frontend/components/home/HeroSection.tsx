@@ -1,36 +1,21 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Search, Sparkles, ShieldCheck, Zap, LockKeyhole, MapPin, Clock, CheckCircle } from 'lucide-react';
+import { Search, Sparkles, ShieldCheck, Zap, LockKeyhole, MapPin, Clock, CheckCircle, PackageSearch, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IMAGES } from '@/lib/images';
 import ReclaimLogoCloud from './ReclaimLogoCloud';
+import { useLanguage } from '@/components/providers/LanguageProvider';
+import api from '@/lib/api';
+import { timeAgo } from '@/lib/utils';
+import type { Item } from '@/types';
 
-// Mock item cards shown in the right-side visual
-const PREVIEW_ITEMS = [
-  {
-    emoji: '🎒', title: 'Black Backpack', sub: 'Lost · Colombo Fort', tag: 'LOST',
-    time: '2 hrs ago', color: 'from-red-50 to-red-100/60 dark:from-red-500/10 dark:to-red-500/5',
-    tagColor: 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400',
-  },
-  {
-    emoji: '🔑', title: 'Key Bundle', sub: 'Found · Kandy City', tag: 'FOUND',
-    time: '5 hrs ago', color: 'from-emerald-50 to-emerald-100/60 dark:from-emerald-500/10 dark:to-emerald-500/5',
-    tagColor: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400',
-  },
-  {
-    emoji: '📱', title: 'Samsung Galaxy', sub: 'Found · Galle Road', tag: 'FOUND',
-    time: '1 day ago', color: 'from-blue-50 to-blue-100/60 dark:from-blue-500/10 dark:to-blue-500/5',
-    tagColor: 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400',
-  },
-];
-
-const MATCH_NOTIFICATION = {
-  emoji: '🎉', title: 'Match found!',
-  sub: 'Your lost wallet matches a found item 2km away',
+type CommunityStats = {
+  users?: { total?: number };
+  items?: { returned?: number };
 };
 
 const STATS_STRIP = [
@@ -43,8 +28,31 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 
 export default function HeroSection() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [query, setQuery] = useState('');
   const [type, setType] = useState<'LOST' | 'FOUND'>('LOST');
+  const [recentItems, setRecentItems] = useState<Item[]>([]);
+  const [communityStats, setCommunityStats] = useState<CommunityStats | null>(null);
+  const [activityLoading, setActivityLoading] = useState(true);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.all([
+      api.get('/items', { limit: 3, sort: 'createdAt', order: 'desc' }, { signal: controller.signal }),
+      api.get('/stats', undefined, { signal: controller.signal }),
+    ])
+      .then(([itemsData, statsData]) => {
+        setRecentItems(itemsData.items ?? []);
+        setCommunityStats(statsData);
+      })
+      .catch((error) => {
+        if (error?.name !== 'AbortError') setCommunityStats(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setActivityLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,18 +92,18 @@ export default function HeroSection() {
             >
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
               <Sparkles size={12} className="text-blue-500" />
-              Smart AI-Powered Matching
+              {t('hero.badge')}
             </motion.div>
 
             <motion.h1
               variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } } }}
               className="text-4xl sm:text-5xl lg:text-6xl font-display font-extrabold text-gray-900 dark:text-white leading-[1.08] tracking-tight mb-5"
             >
-              Find what <span className="gradient-text">matters.</span>
+              {t('hero.h1a')} <span className="gradient-text">{t('hero.h1b')}</span>
               <br />
-              Return what&apos;s{' '}
+              {t('hero.h1c')}{' '}
               <span className="relative inline-block">
-                <span className="gradient-text">lost.</span>
+                <span className="gradient-text">{t('hero.h1d')}</span>
                 <svg className="absolute -bottom-1 left-0 w-full" height="6" viewBox="0 0 100 6" preserveAspectRatio="none">
                   <path d="M0 5 Q50 0 100 5" stroke="url(#ul)" strokeWidth="2.5" fill="none" strokeLinecap="round" />
                   <defs>
@@ -112,7 +120,7 @@ export default function HeroSection() {
               variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } } }}
               className="text-lg text-gray-500 dark:text-gray-400 mb-8 leading-relaxed max-w-lg"
             >
-              ReClaim connects finders and owners through intelligent matching, real-time chat, and secure verification — bringing Sri Lanka&apos;s communities together.
+              {t('hero.sub')}
             </motion.p>
 
             <motion.form
@@ -122,15 +130,15 @@ export default function HeroSection() {
                          flex flex-col sm:flex-row gap-2 max-w-lg border border-gray-100 dark:border-gray-800 mb-6"
             >
               <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1 flex-shrink-0" role="group" aria-label="Report type">
-                {(['LOST', 'FOUND'] as const).map(t => (
-                  <button key={t} type="button" onClick={() => setType(t)} aria-pressed={type === t}
+                {(['LOST', 'FOUND'] as const).map(reportType => (
+                  <button key={reportType} type="button" onClick={() => setType(reportType)} aria-pressed={type === reportType}
                     className={cn('px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200',
-                      type === t
-                        ? t === 'LOST'
+                      type === reportType
+                        ? reportType === 'LOST'
                           ? 'bg-red-500 text-white shadow-sm shadow-red-200'
                           : 'bg-emerald-500 text-white shadow-sm shadow-emerald-200'
                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white')}>
-                    {t === 'LOST' ? '🔍 Lost' : '📦 Found'}
+                    {reportType === 'LOST' ? `🔍 ${t('hero.lost', 'Lost')}` : `📦 ${t('hero.found', 'Found')}`}
                   </button>
                 ))}
               </div>
@@ -138,12 +146,12 @@ export default function HeroSection() {
                 <Search size={16} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
                 <input type="text" value={query} onChange={e => setQuery(e.target.value)}
                   aria-label="Search lost and found items" maxLength={100} autoComplete="off"
-                  placeholder="Search by name, category, location…"
+                  placeholder={t('hero.placeholder')}
                   className="flex-1 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none bg-transparent py-1" />
               </div>
               <button type="submit" className="btn-primary flex items-center justify-center gap-2 flex-shrink-0">
                 <Search size={14} />
-                Search
+                {t('hero.search')}
               </button>
             </motion.form>
 
@@ -154,14 +162,14 @@ export default function HeroSection() {
               <Link href="/items/new?type=LOST"
                 className="text-sm font-semibold text-red-600 dark:text-red-400 hover:text-red-700 flex items-center gap-1.5 group transition-colors">
                 <span className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center text-xs">+</span>
-                Report lost item
+                {t('hero.reportLost')}
                 <span className="group-hover:translate-x-0.5 transition-transform inline-block">→</span>
               </Link>
               <span className="text-gray-200 dark:text-gray-700 select-none">|</span>
               <Link href="/items/new?type=FOUND"
                 className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 flex items-center gap-1.5 group transition-colors">
                 <span className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-xs">+</span>
-                Post found item
+                {t('hero.postFound')}
                 <span className="group-hover:translate-x-0.5 transition-transform inline-block">→</span>
               </Link>
             </motion.div>
@@ -209,35 +217,54 @@ export default function HeroSection() {
 
               {/* Item cards feed */}
               <div className="relative space-y-3 mt-8">
-                {PREVIEW_ITEMS.map((item, i) => (
-                  <motion.div key={item.title}
-                    initial={{ opacity: 0, x: -30, scale: 0.9 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ duration: 0.5, ease: EASE, delay: 0.5 + i * 0.18 }}
-                    whileHover={{ scale: 1.04, x: 4 }}
-                    className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-md p-4
-                               flex items-center gap-3 backdrop-blur-sm"
-                  >
-                    <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 bg-gradient-to-br', item.color)}>
-                      {item.emoji}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2 mb-0.5">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{item.title}</p>
-                        <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0', item.tagColor)}>
-                          {item.tag}
-                        </span>
+                {activityLoading ? [...Array(3)].map((_, index) => (
+                  <div key={index} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white/90 p-4 shadow-md dark:border-gray-800 dark:bg-gray-900/90">
+                    <div className="skeleton size-12 rounded-xl" />
+                    <div className="flex-1 space-y-2"><div className="skeleton h-3 w-2/3" /><div className="skeleton h-2.5 w-full" /></div>
+                  </div>
+                )) : recentItems.length > 0 ? recentItems.map((item, i) => (
+                  <Link key={item.id} href={`/items/${item.id}`} aria-label={`${item.type === 'LOST' ? 'Lost' : 'Found'} item: ${item.title}`}>
+                    <motion.div
+                      initial={{ opacity: 0, x: -30, scale: 0.9 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      transition={{ duration: 0.5, ease: EASE, delay: 0.35 + i * 0.12 }}
+                      whileHover={{ scale: 1.025, x: 4 }}
+                      className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white/95 p-3 shadow-md backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/95"
+                    >
+                      <div className="relative flex size-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100 text-gray-400 dark:bg-gray-800">
+                        {item.images?.[0]?.url ? (
+                          <Image src={item.images[0].url} alt="" fill sizes="48px" className="object-cover" />
+                        ) : <PackageSearch size={21} aria-hidden="true" />}
                       </div>
-                      <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-                        <MapPin size={10} className="flex-shrink-0" />
-                        <span className="truncate">{item.sub}</span>
-                        <span className="ml-auto flex items-center gap-1 flex-shrink-0">
-                          <Clock size={9} /> {item.time}
-                        </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-0.5 flex items-center justify-between gap-2">
+                          <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{item.title}</p>
+                          <span className={cn(
+                            'flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold',
+                            item.type === 'LOST'
+                              ? 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400'
+                              : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400',
+                          )}>
+                            {item.type}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                          <MapPin size={10} className="flex-shrink-0" aria-hidden="true" />
+                          <span className="truncate">{item.locationArea || item.locationLabel}</span>
+                          <span className="ml-auto flex flex-shrink-0 items-center gap-1">
+                            <Clock size={9} aria-hidden="true" /> {timeAgo(item.createdAt)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  </Link>
+                )) : (
+                  <div className="rounded-2xl border border-dashed border-gray-200 bg-white/90 p-6 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900/90">
+                    <PackageSearch size={24} className="mx-auto mb-2 text-primary-500" aria-hidden="true" />
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('hero.noActivity', 'No active reports yet')}</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('hero.startCommunity', 'Be the first to help your community.')}</p>
+                  </div>
+                )}
               </div>
 
               {/* Match notification badge */}
@@ -250,11 +277,17 @@ export default function HeroSection() {
                 <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-emerald-100 dark:border-emerald-500/20 p-3 w-52">
                   <div className="flex items-start gap-2">
                     <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center flex-shrink-0 text-base">
-                      {MATCH_NOTIFICATION.emoji}
+                      <CheckCircle size={17} className="text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-gray-900 dark:text-white">{MATCH_NOTIFICATION.title}</p>
-                      <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed mt-0.5">{MATCH_NOTIFICATION.sub}</p>
+                      <p className="text-xs font-bold text-gray-900 dark:text-white">
+                        {communityStats?.items?.returned
+                          ? `${communityStats.items.returned.toLocaleString()} ${t('hero.returned', 'items returned')}`
+                          : t('hero.safeReturns', 'Safer community returns')}
+                      </p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed mt-0.5">
+                        {t('hero.realStats', 'Live activity from approved ReClaim reports')}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-50 dark:border-gray-800">
@@ -272,14 +305,14 @@ export default function HeroSection() {
                 className="absolute -top-10 -left-12 z-20"
               >
                 <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-blue-100 dark:border-blue-500/20 px-3 py-2 flex items-center gap-2">
-                  <div className="flex -space-x-1.5">
-                    {['bg-blue-400', 'bg-purple-400', 'bg-amber-400'].map((c, i) => (
-                      <div key={i} className={cn('w-5 h-5 rounded-full border-2 border-white dark:border-gray-900 flex items-center justify-center text-white text-[8px] font-bold', c)}>
-                        {['D', 'K', 'A'][i]}
-                      </div>
-                    ))}
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-blue-50 text-primary-600 dark:bg-primary-500/15 dark:text-primary-300">
+                    <Users size={15} aria-hidden="true" />
                   </div>
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Community powered</span>
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                    {communityStats?.users?.total
+                      ? `${communityStats.users.total.toLocaleString()} ${t('hero.members', 'community members')}`
+                      : t('hero.communityPowered', 'Community powered')}
+                  </span>
                 </div>
               </motion.div>
             </div>

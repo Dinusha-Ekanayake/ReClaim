@@ -89,10 +89,11 @@ async function request<T = any>(endpoint: string, options: RequestOptions = {}):
 
   const response = await fetch(url, { ...fetchOptions, headers, credentials: 'include' });
 
-  // Token expired — try refresh
+  // Token expired — refresh only an established session. A 401 from login or
+  // another public auth endpoint must preserve its real server error.
   if (response.status === 401 && !skipAuth) {
     const data = await response.json().catch(() => ({}));
-    if (data.code === 'TOKEN_EXPIRED') {
+    if (data.code === 'TOKEN_EXPIRED' && typeof window !== 'undefined' && localStorage.getItem('hasSession') === 'true') {
       const newToken = await refreshOnce();
       if (newToken) {
         headers['Authorization'] = `Bearer ${newToken}`;
@@ -104,11 +105,14 @@ async function request<T = any>(endpoint: string, options: RequestOptions = {}):
         return retryResponse.json();
       }
     }
-    // Redirect to login
-    if (typeof window !== 'undefined') {
-      window.location.href = '/auth/login?expired=true';
+    if (typeof window !== 'undefined' && localStorage.getItem('hasSession') === 'true') {
+      localStorage.removeItem('hasSession');
+      setAccessToken(null);
+      if (!window.location.pathname.startsWith('/auth/')) {
+        window.location.assign('/auth/login?expired=true');
+      }
     }
-    throw new ApiError('Authentication required', 401);
+    throw new ApiError(data.error || 'Authentication required', 401, data);
   }
 
   if (!response.ok) {
@@ -136,8 +140,8 @@ export const api = {
   patch: <T = any>(endpoint: string, body?: any) =>
     request<T>(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),
 
-  delete: <T = any>(endpoint: string) =>
-    request<T>(endpoint, { method: 'DELETE' }),
+  delete: <T = any>(endpoint: string, body?: any) =>
+    request<T>(endpoint, { method: 'DELETE', ...(body !== undefined && { body: JSON.stringify(body) }) }),
 
   upload: <T = any>(endpoint: string, formData: FormData) =>
     request<T>(endpoint, { method: 'POST', body: formData }),

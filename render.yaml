@@ -14,7 +14,7 @@ services:
     # the new application version starts serving requests.
     buildCommand: npm ci && npx prisma generate && npx prisma migrate deploy
     startCommand: npm start
-    healthCheckPath: /api/health
+    healthCheckPath: /api/health/ready
     autoDeploy: true
     envVars:
       - key: NODE_ENV
@@ -40,6 +40,10 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
       - key: OPENAI_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
         sync: false
       # Your Vercel frontend URL(s), comma-separated. Update after first deploy.
       - key: FRONTEND_URL

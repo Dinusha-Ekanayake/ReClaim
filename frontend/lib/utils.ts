@@ -215,9 +215,3 @@ export function truncate(str?: string | null, length = 100) {
 
   return str.length > length ? str.slice(0, length) + '...' : str;
 }
-
-export function buildImageUrl(path?: string | null) {
-  if (!path) return '/placeholder-item.png';
-  if (path.startsWith('http')) return path;
-  return path;
-}

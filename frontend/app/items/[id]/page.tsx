@@ -42,7 +42,9 @@ export default function ItemDetailPage() {
 
   useEffect(() => {
     if (item && user && item.userId === user.id) {
-      api.get(`/matches/${id}`).then(setMatches).catch(() => {});
+      api.get(`/matches/${id}`).then(setMatches).catch((error) => {
+        toast({ title: 'Match suggestions unavailable', description: error.message, variant: 'destructive' });
+      });
     }
   }, [item, user]);
 

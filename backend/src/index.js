@@ -3,7 +3,6 @@ require('dotenv').config();
 const http = require('http');
 const { validateEnv } = require('./config/env');
 
-// Fail fast if required configuration is missing.
 validateEnv();
 
 const { createApp } = require('./app');
@@ -12,50 +11,56 @@ const prisma = require('./lib/prisma');
 
 const app = createApp();
 const server = http.createServer(app);
-
-// ─── Socket.io ────────────────────────────────────────────────────────────────
 initSocket(server);
 
-// ─── Start ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`\n🚀 ReClaim API running on port ${PORT}`);
-  console.log(`📡 Socket.io ready`);
-  console.log(`🌍 CORS origin: ${process.env.FRONTEND_URL}`);
-  console.log(`🔧 Environment: ${process.env.NODE_ENV}\n`);
+  console.log(`ReClaim API running on port ${PORT}`);
+  console.log('Socket.io ready');
+  console.log(`CORS origin: ${process.env.FRONTEND_URL}`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
 });
 
-// ─── Graceful Shutdown ────────────────────────────────────────────────────────
 let shuttingDown = false;
-async function shutdown(signal) {
+async function shutdown(signal, exitCode = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`\n${signal} received — shutting down gracefully...`);
+  console.log(`${signal} received; shutting down gracefully...`);
 
-  // Stop accepting new connections, then drain.
-  server.close(() => console.log('✅ HTTP server closed'));
+  const forceExit = setTimeout(() => {
+    console.error('Graceful shutdown timed out; forcing exit.');
+    process.exit(1);
+  }, 10000);
+  forceExit.unref();
+
+  await new Promise((resolve) => {
+    server.close(() => {
+      console.log('HTTP server closed');
+      resolve();
+    });
+    server.closeIdleConnections?.();
+  });
 
   try {
     await prisma.$disconnect();
-    console.log('✅ Database disconnected');
+    console.log('Database disconnected');
   } catch (err) {
     console.error('Error disconnecting Prisma:', err);
   }
 
-  // Force-exit if something hangs.
-  setTimeout(() => process.exit(1), 10000).unref();
-  process.exit(0);
+  clearTimeout(forceExit);
+  process.exit(exitCode);
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
-
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
+  shutdown('unhandledRejection', 1);
 });
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
-  shutdown('uncaughtException');
+  shutdown('uncaughtException', 1);
 });
 
 module.exports = { app, server };

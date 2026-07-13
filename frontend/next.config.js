@@ -6,6 +6,13 @@ function originOf(value) {
 
 const apiOrigin = originOf(process.env.NEXT_PUBLIC_API_URL);
 const socketOrigin = originOf(process.env.NEXT_PUBLIC_SOCKET_URL);
+if (process.env.VERCEL && (
+  !apiOrigin.startsWith('https://') ||
+  !socketOrigin.startsWith('https://') ||
+  /localhost|127\.0\.0\.1/.test(`${apiOrigin}${socketOrigin}`)
+)) {
+  throw new Error('Production requires HTTPS NEXT_PUBLIC_API_URL and NEXT_PUBLIC_SOCKET_URL values.');
+}
 const websocketOrigin = socketOrigin.replace(/^http/, 'ws');
 const connectSources = ["'self'", apiOrigin, socketOrigin, websocketOrigin].filter(Boolean).join(' ');
 const contentSecurityPolicy = [
@@ -34,7 +41,6 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'res.cloudinary.com' },
-      { protocol: 'https', hostname: 'via.placeholder.com' },
       { protocol: 'https', hostname: 'api.dicebear.com' },
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'plus.unsplash.com' },

@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 
 const routes = require('./routes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
+const prisma = require('./lib/prisma');
 
 // ─── App Factory ────────────────────────────────────────────────────────────
 // Builds and returns the configured Express app WITHOUT starting a listener,
@@ -73,15 +74,40 @@ function createApp() {
     legacyHeaders: false,
     message: { error: 'Too many accounts created from this address. Please try again later.' },
   });
+  const contactLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many messages submitted. Please try again later.' },
+  });
+  const passwordResetLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many password reset attempts. Please try again later.' },
+  });
 
   app.use('/api/', limiter);
   app.use('/api/auth/login', loginLimiter);
   app.use('/api/auth/register', registerLimiter);
   app.use('/api/auth/refresh', loginLimiter);
+  app.use('/api/contact', contactLimiter);
+  app.use('/api/auth/forgot-password', passwordResetLimiter);
+  app.use('/api/auth/reset-password', passwordResetLimiter);
 
   // ─── Health Check ───────────────────────────────────────────────────────────
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), app: 'ReClaim API' });
+  });
+  app.get('/api/health/ready', async (req, res) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ status: 'ready', database: 'connected', timestamp: new Date().toISOString() });
+    } catch {
+      res.status(503).json({ status: 'unavailable', database: 'disconnected', timestamp: new Date().toISOString() });
+    }
   });
 
   // ─── Routes ─────────────────────────────────────────────────────────────────

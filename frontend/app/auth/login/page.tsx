@@ -137,10 +137,10 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Password</label>
-                <a href="mailto:support@reclaim.app?subject=Password%20reset"
+                <Link href="/auth/forgot-password"
                   className="text-xs text-primary-600 hover:text-primary-700 font-medium">
                   Forgot password?
-                </a>
+                </Link>
               </div>
               <div className="relative">
                 <input type={showPw ? 'text' : 'password'} value={password}
@@ -148,6 +148,7 @@ export default function LoginPage() {
                   placeholder="Your password" required className="input-field pr-11"
                   autoComplete="current-password" />
                 <button type="button" onClick={() => setShowPw(!showPw)}
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
                   {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>

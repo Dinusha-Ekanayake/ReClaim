@@ -52,6 +52,13 @@ enum ReportStatus {
   DISMISSED
 }
 
+enum ContactStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+  SPAM
+}
+
 enum NotificationType {
   MATCH_FOUND
   NEW_MESSAGE
@@ -64,32 +71,34 @@ enum NotificationType {
 }
 
 model User {
-  id         String   @id @default(uuid())
-  email      String   @unique
-  password   String
-  name       String
-  avatarUrl  String?
-  phone      String?
-  showPhone  Boolean  @default(false)
-  role       Role     @default(USER)
-  isVerified Boolean  @default(false)
-  isBanned   Boolean  @default(false)
-  banReason  String?
-  bio        String?
-  location   String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id             String   @id @default(uuid())
+  email          String   @unique
+  password       String
+  name           String
+  avatarUrl      String?
+  avatarPublicId String?
+  phone          String?
+  showPhone      Boolean  @default(false)
+  role           Role     @default(USER)
+  isVerified     Boolean  @default(false)
+  isBanned       Boolean  @default(false)
+  banReason      String?
+  bio            String?
+  location       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
-  items            Item[]
-  comments         Comment[]
-  sentMessages     Message[]         @relation("SentMessages")
-  chatParticipants ChatParticipant[]
-  claimsSubmitted  Claim[]           @relation("ClaimantUser")
-  notifications    Notification[]
-  reports          Report[]          @relation("ReporterUser")
-  reportedItems    Report[]          @relation("ReportedItemOwner")
-  refreshTokens    RefreshToken[]
+  items               Item[]
+  comments            Comment[]
+  sentMessages        Message[]            @relation("SentMessages")
+  chatParticipants    ChatParticipant[]
+  claimsSubmitted     Claim[]              @relation("ClaimantUser")
+  notifications       Notification[]
+  reports             Report[]             @relation("ReporterUser")
+  reportedItems       Report[]             @relation("ReportedItemOwner")
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([email])
   @@index([role])
@@ -104,6 +113,18 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
 }
 
 model Item {
@@ -311,11 +332,27 @@ model Report {
   createdAt   DateTime     @default(now())
 
   item      Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  reporter  User @relation("ReporterUser", fields: [reporterId], references: [id])
-  itemOwner User @relation("ReportedItemOwner", fields: [itemOwnerId], references: [id])
+  reporter  User @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: Cascade)
+  itemOwner User @relation("ReportedItemOwner", fields: [itemOwnerId], references: [id], onDelete: Cascade)
 
   @@unique([itemId, reporterId])
   @@index([itemId])
   @@index([reporterId])
   @@index([status])
+}
+
+model ContactMessage {
+  id         String        @id @default(uuid())
+  name       String
+  email      String
+  subject    String
+  message    String
+  status     ContactStatus @default(NEW)
+  adminNote  String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  resolvedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([email])
 }

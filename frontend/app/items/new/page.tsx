@@ -129,9 +129,10 @@ function NewItemPageContent() {
     }
 
     setLoading(true);
+    let uploaded: { url: string; publicId: string; uploadToken: string }[] = [];
 
     try {
-      const uploaded = await uploadImages();
+      uploaded = await uploadImages();
 
       const item = await api.post('/items', {
         ...form,
@@ -152,6 +153,13 @@ function NewItemPageContent() {
       setSuccess(true);
       setTimeout(() => router.push(`/items/${item.id}`), 1500);
     } catch (err) {
+      if (uploaded.length > 0) {
+        api.delete('/upload/images', {
+          uploads: uploaded.map(({ publicId, uploadToken }) => ({ publicId, uploadToken })),
+        }).catch(() => {
+          // The original posting error is more useful to the user; cleanup is best-effort.
+        });
+      }
       setError(err instanceof ApiError ? err.message : 'Failed to post item. Please try again.');
     } finally {
       setLoading(false);

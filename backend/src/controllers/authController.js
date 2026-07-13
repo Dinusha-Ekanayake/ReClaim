@@ -2,9 +2,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const prisma = require('../lib/prisma');
+const { sendPasswordResetEmail } = require('../services/emailService');
 
 const REFRESH_COOKIE = 'reclaim_refresh';
 const ACCESS_COOKIE = 'reclaim_access';
+const MAX_ACTIVE_SESSIONS = 10;
 
 const digestToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
@@ -43,6 +45,8 @@ function clearAuthCookies(res) {
   clearRefreshCookie(res);
 }
 
+exports.clearAuthCookies = clearAuthCookies;
+
 function getCookie(req, name) {
   const header = req.headers.cookie;
   if (!header) return undefined;
@@ -71,6 +75,30 @@ const generateTokens = (userId) => {
   return { accessToken, refreshToken };
 };
 
+async function storeRefreshToken(tx, userId, refreshToken) {
+  const now = new Date();
+  await tx.refreshToken.deleteMany({ where: { userId, expiresAt: { lte: now } } });
+  await tx.refreshToken.create({
+    data: {
+      token: digestToken(refreshToken),
+      userId,
+      expiresAt: new Date(jwt.decode(refreshToken).exp * 1000),
+    },
+  });
+
+  const staleSessions = await tx.refreshToken.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    skip: MAX_ACTIVE_SESSIONS,
+    select: { id: true },
+  });
+  if (staleSessions.length) {
+    await tx.refreshToken.deleteMany({
+      where: { id: { in: staleSessions.map(session => session.id) } },
+    });
+  }
+}
+
 // POST /api/auth/register
 exports.register = async (req, res, next) => {
   try {
@@ -82,24 +110,18 @@ exports.register = async (req, res, next) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
-    const user = await prisma.user.create({
-      data: { name, email, password: hashedPassword },
-      select: { id: true, name: true, email: true, role: true, avatarUrl: true, createdAt: true },
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { name, email, password: hashedPassword },
+        select: { id: true, name: true, email: true, role: true, avatarUrl: true, createdAt: true },
+      });
+      const tokens = generateTokens(user.id);
+      await storeRefreshToken(tx, user.id, tokens.refreshToken);
+      return { user, ...tokens };
     });
 
-    const { accessToken, refreshToken } = generateTokens(user.id);
-
-    // Store refresh token
-    await prisma.refreshToken.create({
-      data: {
-        token: digestToken(refreshToken),
-        userId: user.id,
-        expiresAt: new Date(jwt.decode(refreshToken).exp * 1000),
-      },
-    });
-
-    setAuthCookies(res, accessToken, refreshToken);
-    res.status(201).json({ user, accessToken });
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+    res.status(201).json({ user: result.user, accessToken: result.accessToken });
   } catch (err) {
     next(err);
   }
@@ -119,12 +141,8 @@ exports.login = async (req, res, next) => {
 
     const { accessToken, refreshToken } = generateTokens(user.id);
 
-    await prisma.refreshToken.create({
-      data: {
-        token: digestToken(refreshToken),
-        userId: user.id,
-        expiresAt: new Date(jwt.decode(refreshToken).exp * 1000),
-      },
+    await prisma.$transaction(async (tx) => {
+      await storeRefreshToken(tx, user.id, refreshToken);
     });
 
     const { password: _, ...safeUser } = user;
@@ -132,6 +150,82 @@ exports.login = async (req, res, next) => {
     res.json({ user: safeUser, accessToken });
   } catch (err) {
     next(err);
+  }
+};
+
+// POST /api/auth/forgot-password
+exports.forgotPassword = async (req, res, next) => {
+  const response = { message: 'If an account exists for that email, a reset link will be sent.' };
+  try {
+    if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
+      return res.status(503).json({ error: 'Password reset email is temporarily unavailable' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: req.body.email },
+      select: { id: true, name: true, email: true, isBanned: true },
+    });
+    if (!user || user.isBanned) return res.status(202).json(response);
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = digestToken(rawToken);
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await prisma.$transaction([
+      prisma.passwordResetToken.deleteMany({ where: { userId: user.id } }),
+      prisma.passwordResetToken.create({ data: { tokenHash, userId: user.id, expiresAt } }),
+    ]);
+
+    const frontendOrigin = (process.env.FRONTEND_URL || 'http://localhost:3000').split(',')[0].trim().replace(/\/$/, '');
+    const resetUrl = `${frontendOrigin}/auth/reset-password?token=${encodeURIComponent(rawToken)}`;
+    try {
+      const sent = await sendPasswordResetEmail({ to: user.email, name: user.name, resetUrl });
+      if (!sent && process.env.NODE_ENV !== 'production') response.devResetUrl = resetUrl;
+    } catch (emailError) {
+      await prisma.passwordResetToken.deleteMany({ where: { tokenHash } });
+      console.error('Password reset email delivery failed:', emailError.message);
+    }
+
+    res.status(202).json(response);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/auth/reset-password
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const tokenHash = digestToken(req.body.token);
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      select: { id: true, userId: true, expiresAt: true, usedAt: true },
+    });
+
+    if (!resetToken || resetToken.usedAt || resetToken.expiresAt <= new Date()) {
+      return res.status(400).json({ error: 'This reset link is invalid or has expired' });
+    }
+
+    const password = await bcrypt.hash(req.body.password, 12);
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.passwordResetToken.updateMany({
+        where: { id: resetToken.id, usedAt: null, expiresAt: { gt: new Date() } },
+        data: { usedAt: new Date() },
+      });
+      if (claimed.count !== 1) {
+        const error = new Error('This reset link is invalid or has expired');
+        error.status = 400;
+        throw error;
+      }
+      await tx.user.update({ where: { id: resetToken.userId }, data: { password } });
+      await tx.refreshToken.deleteMany({ where: { userId: resetToken.userId } });
+      await tx.passwordResetToken.deleteMany({
+        where: { userId: resetToken.userId, id: { not: resetToken.id } },
+      });
+    });
+
+    clearAuthCookies(res);
+    res.json({ message: 'Password updated. Sign in with your new password.' });
+  } catch (error) {
+    next(error);
   }
 };
 
@@ -161,13 +255,7 @@ exports.refresh = async (req, res, next) => {
     // Rotate refresh token
     await prisma.$transaction(async (tx) => {
       await tx.refreshToken.delete({ where: { id: stored.id } });
-      await tx.refreshToken.create({
-        data: {
-          token: digestToken(tokens.refreshToken),
-          userId: decoded.userId,
-          expiresAt: new Date(jwt.decode(tokens.refreshToken).exp * 1000),
-        },
-      });
+      await storeRefreshToken(tx, decoded.userId, tokens.refreshToken);
     });
 
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Search, ExternalLink, Trash2, CheckCircle, XCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { cn, timeAgo, getStatusColor, getStatusLabel } from '@/lib/utils';
+import { toast } from '@/components/ui/toaster';
 
 export default function AdminItemsPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -26,6 +27,8 @@ export default function AdminItemsPage() {
       });
       setItems(data.items);
       setTotal(data.total);
+    } catch (error: any) {
+      toast({ title: 'Could not load items', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -37,7 +40,9 @@ export default function AdminItemsPage() {
     try {
       await api.patch(`/admin/items/${id}/approve`, { isApproved: approved });
       setItems(prev => prev.map(i => i.id === id ? { ...i, isApproved: approved } : i));
-    } catch {}
+    } catch (error: any) {
+      toast({ title: 'Could not update approval', description: error.message, variant: 'destructive' });
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -45,7 +50,9 @@ export default function AdminItemsPage() {
       await api.delete(`/admin/items/${id}`);
       setItems(prev => prev.filter(i => i.id !== id));
       setDeleteId(null);
-    } catch {}
+    } catch (error: any) {
+      toast({ title: 'Could not delete item', description: error.message, variant: 'destructive' });
+    }
   };
 
   return (

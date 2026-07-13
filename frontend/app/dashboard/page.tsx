@@ -13,21 +13,20 @@ export default function DashboardPage() {
   const [items, setItems] = useState<any[]>([]);
   const [stats, setStats] = useState({ total: 0, active: 0, returned: 0, claims: 0 });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([
-      api.get('/users/' + user?.id + '/items', { limit: 4 }),
-    ]).then(([itemsData]) => {
-      setItems(itemsData.items);
-      const total = itemsData.total;
-      const active = itemsData.items.filter((i: any) => i.status === 'ACTIVE').length;
-      const returned = itemsData.items.filter((i: any) => i.status === 'RETURNED').length;
-      setStats({ total, active, returned, claims: 0 });
-    }).finally(() => setLoading(false));
+    if (!user?.id) return;
+    api.get('/users/me/dashboard').then(data => {
+      setItems(data.items ?? []);
+      setStats(data.stats);
+    }).catch(() => setError('Dashboard data could not be loaded. Refresh to try again.'))
+      .finally(() => setLoading(false));
   }, [user?.id]);
 
   return (
     <div className="space-y-8">
+      {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">{error}</div>}
       {/* Welcome */}
       <div className="card p-6 bg-gradient-to-br from-primary-600 to-primary-700 text-white">
         <div className="flex items-center justify-between">
@@ -43,7 +42,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-blue-200 text-sm">Welcome back,</p>
               <h2 className="text-2xl font-display font-bold">{user?.name}</h2>
-              <p className="text-blue-200 text-xs mt-0.5">Member since {formatDate(user as any, 'MMM yyyy')}</p>
+              {user?.createdAt && <p className="text-blue-200 text-xs mt-0.5">Member since {formatDate(user.createdAt, 'MMM yyyy')}</p>}
             </div>
           </div>
           <Link href="/items/new"

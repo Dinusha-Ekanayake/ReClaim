@@ -8,6 +8,9 @@ const errorHandler = (err, req, res, next) => {
   if (err.code === 'P2025') {
     return res.status(404).json({ error: 'Record not found' });
   }
+  if (err.code === 'P1001' || err.code === 'P2024' || err.name === 'PrismaClientInitializationError') {
+    return res.status(503).json({ error: 'Data service temporarily unavailable' });
+  }
 
   // Multer errors
   if (err.code === 'LIMIT_FILE_SIZE') {

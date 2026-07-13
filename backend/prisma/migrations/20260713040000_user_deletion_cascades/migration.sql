@@ -1,0 +1,10 @@
+ALTER TABLE "Report" DROP CONSTRAINT IF EXISTS "Report_reporterId_fkey";
+ALTER TABLE "Report" DROP CONSTRAINT IF EXISTS "Report_itemOwnerId_fkey";
+
+ALTER TABLE "Report"
+  ADD CONSTRAINT "Report_reporterId_fkey"
+  FOREIGN KEY ("reporterId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "Report"
+  ADD CONSTRAINT "Report_itemOwnerId_fkey"
+  FOREIGN KEY ("itemOwnerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

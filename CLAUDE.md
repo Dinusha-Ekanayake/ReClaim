@@ -40,8 +40,8 @@ reclaim/
 │   │       └── prisma.js     # Singleton PrismaClient (always import from here)
 │   └── prisma/
 │       ├── schema.prisma     # Full DB schema (see enums below)
-│       └── seed.js           # Seeds admin@reclaim.app / Admin@123
-└── frontend/                 # Next.js 14, Tailwind CSS, shadcn/ui components
+│       └── seed.js           # Seeds the explicitly configured administrator
+└── frontend/                 # Next.js 16, Tailwind CSS, shadcn/ui components
     ├── app/                  # Next.js App Router pages
     │   ├── page.tsx          # Home (Hero, Stats, Categories, Recent items)
     │   ├── items/            # Browse + detail + edit + new
@@ -72,7 +72,7 @@ reclaim/
 
 | Layer | Tech |
 |-------|------|
-| Frontend | Next.js 14, React 18, Tailwind CSS, shadcn/ui (Radix primitives), Zustand |
+| Frontend | Next.js 16, React 18, Tailwind CSS, shadcn/ui (Radix primitives), Zustand |
 | Backend | Node.js, Express 4, Socket.io 4 |
 | Database | PostgreSQL via Prisma ORM (hosted on Supabase) |
 | Auth | JWT access tokens (15m) + refresh tokens (7d, rotated on use) |
@@ -89,13 +89,13 @@ reclaim/
 cd backend
 npm run dev          # nodemon src/index.js
 npm test             # jest --runInBand (NODE_ENV=test)
-npm run seed         # node prisma/seed.js — seeds admin@reclaim.app / Admin@123
+npm run seed         # node prisma/seed.js — requires ADMIN_PASSWORD
 
 # Frontend
 cd frontend
 npm run dev          # next dev (http://localhost:3000)
 npm run build        # next build
-npm run lint         # next lint
+npm run lint         # ESLint flat-config checks
 ```
 
 Backend → http://localhost:5000/api
@@ -146,7 +146,7 @@ npx prisma studio                      # GUI browser
 node prisma/seed.js                    # seed admin user
 ```
 
-Default admin after seed: `admin@reclaim.app` / `Admin@123` — change immediately in production.
+Set a unique `ADMIN_PASSWORD` (minimum 12 characters) before running the seed. The seed refuses to create an administrator with a built-in/default password.
 
 ## Key Architecture Patterns
 
@@ -158,7 +158,7 @@ const prisma = require('../lib/prisma');
 ```
 
 ### Auth Middleware
-- `authenticate` — requires valid JWT Bearer token, attaches `req.user`. Returns 401 with `code: 'TOKEN_EXPIRED'` on expiry so frontend can refresh automatically.
+- `authenticate` — accepts the HttpOnly access cookie or a valid JWT Bearer token, then attaches `req.user`. Returns 401 with `code: 'TOKEN_EXPIRED'` on expiry so the frontend can refresh automatically.
 - `optionalAuth` — attaches user if token present, continues without error if not (used on public item browsing)
 - `requireAdmin` — requires ADMIN or SUPER_ADMIN role (apply after `authenticate`)
 - `requireSuperAdmin` — requires SUPER_ADMIN only
@@ -190,15 +190,15 @@ Socket auth uses the same JWT. Users auto-join `user:{id}` room on connect. The 
 - `/api/auth/login` and `/api/auth/register`: 20 req / 15 min (applied on top of global)
 
 ### Image Upload
-`POST /api/upload/images` — uploads to Cloudinary via multer memory storage. Returns `{ images: [{ url, publicId }] }`. Clients then pass `imageUrls[]` and `imagePublicIds[]` to item create/update. Max 5 images, 5MB each.
+`POST /api/upload/images` — uploads to Cloudinary via multer memory storage. Returns `{ images: [{ url, publicId, uploadToken }] }`. Clients pass all three arrays to item creation; the signed, user-bound receipt prevents arbitrary Cloudinary asset deletion. Max 5 images, 5MB each.
 
 `POST /api/upload/avatar` — single image upload for user avatars.
 
 ### Frontend API Client (`frontend/lib/api.ts`)
 Custom fetch wrapper. Automatically:
-1. Attaches Bearer token from localStorage
-2. On 401 with `code: TOKEN_EXPIRED`, refreshes tokens and retries once
-3. On failed refresh, redirects to `/auth/login?expired=true`
+1. Sends credentialed requests; the access token is kept in memory and mirrored in an HttpOnly cookie
+2. On 401 with `code: TOKEN_EXPIRED`, rotates the HttpOnly refresh cookie and retries once
+3. Coalesces concurrent refresh attempts and redirects to `/auth/login?expired=true` when recovery fails
 
 ### Frontend Auth Flow
 `AuthProvider` calls `initialize()` on mount → fetches `/api/auth/me` if token exists. `SocketProvider` connects socket only when a user is authenticated, keyed on `user?.id`.
@@ -237,5 +237,5 @@ Custom fetch wrapper. Automatically:
 - Prisma `P2002` = unique constraint violation (409); `P2025` = record not found (404) — handled in `errorHandler.js`.
 - In `routes/users.js`, `PATCH /me` **must** be defined before `GET /:id` — otherwise Express matches `/me` as a user ID parameter, making the update endpoint unreachable.
 - Admin role change only allows setting USER or ADMIN (not SUPER_ADMIN) — intentional; only direct DB access can elevate to SUPER_ADMIN.
-- `POST /api/auth/logout` requires `authenticate`. Clients with an expired access token should use the api.ts client (auto-refreshes) or simply clear localStorage client-side if the backend returns 401.
+- `POST /api/auth/logout` clears the access/refresh cookies and invalidates the hashed refresh-token record. It intentionally works even when the access token has expired.
 - `backend/package.json` `prisma` field must be inside the root JSON object. A missing closing brace before it causes a JSON parse error at `npm install`.

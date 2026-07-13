@@ -13,30 +13,29 @@ router.use(authenticate, requireAdmin);
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────
 router.get('/stats', async (req, res, next) => {
   try {
-    const [
-      totalUsers, totalItems, lostItems, foundItems,
-      returnedItems, activeItems, totalReports, pendingReports,
-      totalClaims, pendingClaims, recentUsers, recentItems,
-    ] = await Promise.all([
-      prisma.user.count({ where: { role: 'USER' } }),
-      prisma.item.count(),
-      prisma.item.count({ where: { type: 'LOST' } }),
-      prisma.item.count({ where: { type: 'FOUND' } }),
-      prisma.item.count({ where: { status: 'RETURNED' } }),
-      prisma.item.count({ where: { status: 'ACTIVE' } }),
-      prisma.report.count(),
-      prisma.report.count({ where: { status: 'PENDING' } }),
-      prisma.claim.count(),
-      prisma.claim.count({ where: { status: 'PENDING' } }),
-      // Users last 7 days
-      prisma.user.count({
-        where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
-      }),
-      // Items last 7 days
-      prisma.item.count({
-        where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
-      }),
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [userRoles, itemGroups, reportGroups, claimGroups, recentUsers, recentItems] = await Promise.all([
+      prisma.user.groupBy({ by: ['role'], _count: { _all: true } }),
+      prisma.item.groupBy({ by: ['type', 'status'], _count: { _all: true } }),
+      prisma.report.groupBy({ by: ['status'], _count: { _all: true } }),
+      prisma.claim.groupBy({ by: ['status'], _count: { _all: true } }),
+      prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
+      prisma.item.count({ where: { createdAt: { gte: weekAgo } } }),
     ]);
+
+    const sum = (rows, predicate = () => true) => rows
+      .filter(predicate)
+      .reduce((total, row) => total + row._count._all, 0);
+    const totalUsers = sum(userRoles, row => row.role === 'USER');
+    const totalItems = sum(itemGroups);
+    const lostItems = sum(itemGroups, row => row.type === 'LOST');
+    const foundItems = sum(itemGroups, row => row.type === 'FOUND');
+    const returnedItems = sum(itemGroups, row => row.status === 'RETURNED');
+    const activeItems = sum(itemGroups, row => row.status === 'ACTIVE');
+    const totalReports = sum(reportGroups);
+    const pendingReports = sum(reportGroups, row => row.status === 'PENDING');
+    const totalClaims = sum(claimGroups);
+    const pendingClaims = sum(claimGroups, row => row.status === 'PENDING');
 
     // Success rate
     const successRate = totalItems > 0 ? Math.round((returnedItems / totalItems) * 100) : 0;
@@ -103,6 +102,10 @@ router.get('/users', [
 router.patch('/users/:id/ban', [
   body('isBanned').isBoolean(),
   body('banReason').optional({ nullable: true }).trim().isLength({ max: 500 }),
+  body('banReason').custom((value, { req }) => {
+    if (req.body.isBanned && (!value || value.length < 3)) throw new Error('Ban reason must be at least 3 characters');
+    return true;
+  }),
 ], validate, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -373,6 +376,61 @@ router.patch('/reports/:id', [
     res.json(updated);
   } catch (err) {
     next(err);
+  }
+});
+
+// Contact inbox
+router.get('/contacts', [
+  query('status').optional().isIn(['NEW', 'IN_PROGRESS', 'RESOLVED', 'SPAM']),
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+  query('search').optional().trim().isLength({ max: 120 }),
+], validate, async (req, res, next) => {
+  try {
+    const { status, search } = req.query;
+    const pagination = getPagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+    const where = {
+      ...(status && { status }),
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { subject: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
+    const [contacts, total] = await Promise.all([
+      prisma.contactMessage.findMany({
+        where,
+        skip: pagination.skip,
+        take: pagination.limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.contactMessage.count({ where }),
+    ]);
+    res.json({ contacts, ...paginationResult(total, pagination.page, pagination.limit) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/contacts/:id', [
+  body('status').isIn(['NEW', 'IN_PROGRESS', 'RESOLVED', 'SPAM']),
+  body('adminNote').optional({ nullable: true }).trim().isLength({ max: 1000 }),
+], validate, async (req, res, next) => {
+  try {
+    const contact = await prisma.contactMessage.update({
+      where: { id: req.params.id },
+      data: {
+        status: req.body.status,
+        ...(req.body.adminNote !== undefined && { adminNote: req.body.adminNote || null }),
+        resolvedAt: req.body.status === 'RESOLVED' ? new Date() : null,
+      },
+    });
+    res.json(contact);
+  } catch (error) {
+    if (error.code === 'P2025') return res.status(404).json({ error: 'Contact message not found' });
+    next(error);
   }
 });
 

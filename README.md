@@ -95,6 +95,7 @@ cd ../frontend && npm install
 **`backend/.env`**
 ```env
 DATABASE_URL=postgresql://user:password@host:5432/reclaim
+DIRECT_URL=postgresql://user:password@host:5432/reclaim
 JWT_SECRET=your-secret-key
 JWT_REFRESH_SECRET=your-refresh-secret-key
 JWT_EXPIRES_IN=15m
@@ -103,6 +104,8 @@ CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=your-api-key
 CLOUDINARY_API_SECRET=your-api-secret
 OPENAI_API_KEY=sk-...          # optional
+RESEND_API_KEY=re_...
+EMAIL_FROM=ReClaim <no-reply@your-domain.com>
 FRONTEND_URL=http://localhost:3000
 PORT=5000
 NODE_ENV=development
@@ -115,7 +118,7 @@ ADMIN_NAME=ReClaim Admin
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000/api
 NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
-NEXT_PUBLIC_GOOGLE_MAPS_KEY=...   # optional
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 ### 3. Set up the database
@@ -199,7 +202,7 @@ cd frontend
 vercel --prod
 ```
 
-Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` in the Vercel dashboard.
+Set `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SOCKET_URL`, and `NEXT_PUBLIC_SITE_URL` in the Vercel dashboard.
 
 ### Backend → Render (free)
 
