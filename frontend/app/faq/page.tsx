@@ -1,87 +1,105 @@
 import type { Metadata } from 'next';
-import PublicLayout from '@/components/layout/PublicLayout';
 import Link from 'next/link';
+import { ArrowRight, ChevronDown, CircleHelp, MessageSquareText } from 'lucide-react';
+import PublicLayout from '@/components/layout/PublicLayout';
 
-export const metadata: Metadata = { title: 'FAQ — Frequently Asked Questions' };
+export const metadata: Metadata = { title: 'Frequently Asked Questions' };
 
 const FAQS = [
   {
-    q: 'Is ReClaim free to use?',
-    a: 'Yes. ReClaim is completely free for all users — posting items, claiming, chatting, and all features.',
+    question: 'Is ReClaim free to use?',
+    answer: 'Yes. ReClaim currently has no payment step for creating an account, posting a report, submitting a claim, or using chat.',
   },
   {
-    q: 'How does the AI matching work?',
-    a: 'When you post an item, ReClaim scores it against all active counterpart items using a weighted algorithm: category (25%), keyword similarity (25%), GPS proximity (20%), date closeness (15%), colour/brand (10%), and AI text embeddings (5%). Matches scoring above 60% trigger an automatic notification.',
+    question: 'How does item matching work?',
+    answer: 'ReClaim compares active lost and found reports in the same category. The score uses category (25%), keywords (25%), location (20%), date (15%), colour and brand (10%), and text embeddings when available (5%). Suggestions scoring at least 30% can be retained, and matches scoring 60% or more trigger notifications. A score is a lead, not proof of ownership.',
   },
   {
-    q: 'What are verification hints?',
-    a: "When you post a found item, you can add 1–3 hidden hints — details only the true owner would know (e.g. a scratch on the back, contents of a wallet). Claimants must answer these correctly before you approve the claim, preventing fraud.",
+    question: 'How do ownership questions protect a found item?',
+    answer: 'A found-item report includes one to five ownership questions. The questions are prompts, not hidden correct answers stored by ReClaim. A claimant writes an answer to every question, and those answers are shared with the finder for a human decision. Avoid putting the expected answer in the public description or photos.',
   },
   {
-    q: 'How do I claim a found item?',
-    a: "Open the item's detail page and click \"Claim this item\". You'll be asked to answer the finder's verification questions and optionally include a message. The finder reviews your answers and approves or rejects your claim.",
+    question: 'How do I claim a found item?',
+    answer: 'Open an available found-item report, choose “Claim this item,” answer every ownership question, and optionally add a message. You must be signed in, and you cannot claim your own report. The finder reviews the written answers and approves or rejects the claim.',
   },
   {
-    q: 'Can I browse items without an account?',
-    a: 'Yes. You can browse and search all public items without signing in. An account is required to post items, send messages, or submit claims.',
+    question: 'Can I browse without an account?',
+    answer: 'Yes. Public, approved reports can be browsed and searched without signing in. An account is required to post, comment, claim, report a concern, or use chat.',
   },
   {
-    q: 'How do I mark my item as returned?',
-    a: 'Once a claim is approved, your item is automatically marked as "Returned". You can also manually change the status from your Dashboard → My Items.',
+    question: 'When is an item marked as returned?',
+    answer: 'Approving a claim marks that item as returned automatically. An owner can also close or mark an active or matched report as returned from their dashboard. A report with a pending claim must be reviewed first, and completed reports cannot be reopened by the owner.',
   },
   {
-    q: 'What happens if someone files a fake claim?',
-    a: "The verification question system prevents most fake claims. If you suspect fraud, reject the claim and use the \"Report\" button on the user's profile. Admins review all reports.",
+    question: 'How do I report a suspicious or inappropriate listing?',
+    answer: 'While signed in, open the item and choose “Report a concern.” Select the reason and add relevant context. The report enters the administrator moderation queue for review; submitting a report does not automatically remove the item or prove a violation.',
   },
   {
-    q: 'Is my phone number visible to others?',
-    a: 'No. Your phone number is private by default. You can choose to show it in your Settings → Privacy, in which case it will appear on your item detail pages.',
+    question: 'When is my phone number shown?',
+    answer: 'A phone number is public on an item only when both controls are enabled: “Show phone on listings” in Dashboard Settings and the contact-sharing option on that specific report. Otherwise, public viewers do not receive it. The report owner and administrators can still access the report-management view.',
   },
   {
-    q: 'How do I delete my account?',
-    a: 'Email us at support@reclaim.app with "Account deletion request" in the subject. We will delete your data within 7 business days.',
+    question: 'How do I permanently delete my account?',
+    answer: 'Go to Dashboard → Settings, find “Delete account,” and confirm with your current password and the word DELETE. This permanently removes the account and associated user-owned data and cannot be undone.',
   },
   {
-    q: 'The map is not showing for my item. Why?',
-    a: "The map requires GPS coordinates. When posting an item, make sure to allow location access or manually enter coordinates. If you only enter a text address, the map will not display.",
+    question: 'Why does the public map show an area instead of an exact pin?',
+    answer: 'On an item detail page, public viewers receive an approximate location: the area label is preferred, coordinates are rounded to two decimal places, and the map shows an area circle rather than an exact marker. Owner and administrator views can receive the precise saved location. If no coordinates were saved, no map is shown.',
   },
-];
+] as const;
 
 export default function FaqPage() {
   return (
     <PublicLayout>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-14">
-          <p className="text-sm font-semibold text-primary-600 dark:text-primary-400 mb-3">Help Centre</p>
-          <h1 className="text-4xl font-display font-extrabold text-gray-900 dark:text-white mb-4">Frequently Asked Questions</h1>
-          <p className="text-gray-500 dark:text-gray-400">Can't find your answer? <Link href="/contact" className="text-primary-600 dark:text-primary-400 hover:underline font-medium">Contact us</Link></p>
-        </div>
+      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
+        <header className="grid gap-5 border-b border-slate-200 pb-8 dark:border-slate-800 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div>
+            <div className="inline-flex min-h-8 items-center gap-2 rounded-full bg-primary-50 px-3 text-xs font-bold uppercase tracking-[0.14em] text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
+              <CircleHelp size={14} aria-hidden="true" />
+              Help centre
+            </div>
+            <h1 className="mt-4 font-display text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-5xl">Clear answers, based on how ReClaim works.</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 sm:text-base">
+              Matching, privacy, claiming, moderation, and account controls in plain language.
+            </p>
+          </div>
+          <Link href="/contact" className="btn-outline inline-flex w-fit items-center gap-2">
+            Ask another question <ArrowRight size={16} aria-hidden="true" />
+          </Link>
+        </header>
 
-        <div className="space-y-4">
-          {FAQS.map((faq, i) => (
-            <details key={i}
-              className="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden
-                         hover:border-gray-200 dark:hover:border-gray-700 transition-colors">
-              <summary className="flex items-center justify-between gap-4 px-6 py-5 cursor-pointer
-                                  font-semibold text-gray-900 dark:text-white list-none select-none">
-                {faq.q}
-                <span className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0
-                                  text-gray-500 dark:text-gray-400 group-open:rotate-45 transition-transform duration-200 text-lg font-light">
-                  +
+        <section className="mt-6 space-y-2" aria-label="Frequently asked questions">
+          {FAQS.map((faq, index) => (
+            <details
+              key={faq.question}
+              className="group overflow-hidden rounded-2xl border border-slate-200 bg-white open:border-primary-200 open:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:open:border-primary-500/30"
+            >
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-left text-sm font-bold text-slate-900 marker:content-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-white sm:px-5">
+                <span className="flex min-w-0 items-start gap-3">
+                  <span className="mt-0.5 font-mono text-[11px] font-bold text-slate-300 dark:text-slate-600">{String(index + 1).padStart(2, '0')}</span>
+                  <span>{faq.question}</span>
                 </span>
+                <ChevronDown size={18} className="shrink-0 text-slate-400 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
               </summary>
-              <div className="px-6 pb-5 text-gray-600 dark:text-gray-300 text-sm leading-relaxed border-t border-gray-50 dark:border-gray-800 pt-4">
-                {faq.a}
+              <div className="border-t border-slate-100 px-4 py-4 pl-12 text-sm leading-6 text-slate-600 dark:border-slate-800 dark:text-slate-300 sm:px-5 sm:pl-[3.75rem]">
+                {faq.answer}
               </div>
             </details>
           ))}
-        </div>
+        </section>
 
-        <div className="mt-14 text-center p-8 bg-primary-50 dark:bg-primary-500/10 rounded-2xl border border-primary-100 dark:border-primary-500/20">
-          <h3 className="font-display font-bold text-gray-900 dark:text-white mb-2">Still have questions?</h3>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-5">Our team is happy to help you.</p>
-          <Link href="/contact" className="btn-primary inline-flex">Get in touch</Link>
-        </div>
+        <aside className="mt-6 flex flex-col gap-4 rounded-3xl bg-primary-700 p-6 text-white sm:flex-row sm:items-center sm:justify-between" aria-labelledby="faq-contact-title">
+          <div className="flex items-start gap-3">
+            <MessageSquareText size={22} className="mt-0.5 shrink-0 text-primary-100" aria-hidden="true" />
+            <div>
+              <h2 id="faq-contact-title" className="font-display text-lg font-bold">Need help with a specific situation?</h2>
+              <p className="mt-1 text-sm leading-relaxed text-primary-100">Send the support team the relevant report title and a clear description of what happened.</p>
+            </div>
+          </div>
+          <Link href="/contact" className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-white px-5 text-sm font-bold text-primary-800 hover:bg-primary-50">
+            Contact support
+          </Link>
+        </aside>
       </div>
     </PublicLayout>
   );

@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import api, { restoreAccessToken, setAccessToken } from '@/lib/api';
+import api, { ApiError, restoreAccessToken, setAccessToken } from '@/lib/api';
+import { removeLocalStorage, writeLocalStorage } from '@/lib/browserStorage';
+import { useNotificationStore } from '@/lib/store/notificationStore';
 
 interface User {
   id: string;
@@ -21,7 +23,12 @@ interface AuthState {
   isInitialized: boolean;
 
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<{
+    message: string;
+    emailSent: boolean;
+    devVerificationUrl?: string;
+  }>;
+  verifyEmail: (token: string) => Promise<{ message: string }>;
   logout: () => Promise<void>;
   initialize: () => Promise<void>;
   updateUser: (data: Partial<User>) => void;
@@ -34,18 +41,33 @@ export const useAuthStore = create<AuthState>((set) => ({
   isInitialized: false,
 
   initialize: async () => {
-    const restored = await restoreAccessToken();
+    let restored = false;
+    try {
+      restored = await restoreAccessToken();
+    } catch {
+      // A transient network, rate-limit, or backend outage must not destroy a
+      // valid browser session. A later online event/reload can restore it.
+      set({ isInitialized: true });
+      return;
+    }
     if (!restored) {
+      useNotificationStore.getState().reset();
       set({ isInitialized: true });
       return;
     }
     try {
       const user = await api.get('/auth/me');
+      useNotificationStore.getState().reset();
       set({ user, isInitialized: true });
-    } catch {
-      localStorage.removeItem('hasSession');
-      setAccessToken(null);
-      set({ user: null, isInitialized: true });
+    } catch (error) {
+      if (error instanceof ApiError && [401, 403].includes(error.status)) {
+        removeLocalStorage('hasSession');
+        setAccessToken(null);
+        useNotificationStore.getState().reset();
+        set({ user: null, isInitialized: true });
+        return;
+      }
+      set({ isInitialized: true });
     }
   },
 
@@ -54,7 +76,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const data = await api.post('/auth/login', { email, password });
       setAccessToken(data.accessToken);
-      localStorage.setItem('hasSession', 'true');
+      writeLocalStorage('hasSession', 'true');
+      useNotificationStore.getState().reset();
       set({ user: data.user, isLoading: false });
     } catch (err) {
       set({ isLoading: false });
@@ -66,21 +89,42 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const data = await api.post('/auth/register', { name, email, password });
-      setAccessToken(data.accessToken);
-      localStorage.setItem('hasSession', 'true');
-      set({ user: data.user, isLoading: false });
+      set({ isLoading: false });
+      return data;
     } catch (err) {
       set({ isLoading: false });
       throw err;
     }
   },
 
-  logout: async () => {
+  verifyEmail: async (token) => {
+    set({ isLoading: true });
     try {
-      await api.post('/auth/logout');
-    } catch {}
-    localStorage.removeItem('hasSession');
+      const data = await api.post<{ message: string }>('/auth/verify-email', { token });
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  logout: async () => {
+    let backendError: unknown = null;
+    try { await api.post('/auth/logout'); } catch (error) { backendError = error; }
+    try {
+      const response = await fetch('/session/logout', {
+        method: 'POST',
+        credentials: 'include',
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!response.ok) throw new Error('Local session could not be cleared');
+    } catch (localError) {
+      throw backendError || localError;
+    }
+    removeLocalStorage('hasSession');
     setAccessToken(null);
+    useNotificationStore.getState().reset();
     set({ user: null });
   },
 
@@ -89,8 +133,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   clearSession: () => {
-    localStorage.removeItem('hasSession');
+    removeLocalStorage('hasSession');
     setAccessToken(null);
+    useNotificationStore.getState().reset();
     set({ user: null });
   },
 }));

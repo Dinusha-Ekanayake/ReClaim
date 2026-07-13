@@ -68,6 +68,8 @@ export interface Item {
   user?: Partial<User>;
   images?: ItemImage[];
   verificationHints?: string[];
+  verificationQuestions?: string[];
+  viewerHasClaim?: boolean;
   _count?: { comments: number; claims: number };
 }
 
@@ -89,6 +91,7 @@ export interface Comment {
   content: string;
   parentId?: string;
   createdAt: string;
+  isHidden?: boolean;
   user?: Partial<User>;
   replies?: Comment[];
 }

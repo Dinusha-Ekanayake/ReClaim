@@ -1,20 +1,41 @@
 const path = require('path');
 
-function originOf(value) {
-  try { return value ? new URL(value).origin : ''; } catch { return ''; }
+const isProduction = process.env.NODE_ENV === 'production';
+
+function configuredUrl(name, developmentFallback, requiredPath) {
+  const configured = process.env[name];
+  if (isProduction && !configured) {
+    throw new Error(`Production requires ${name}.`);
+  }
+
+  const raw = (configured || developmentFallback).replace(/\/+$/, '');
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(`${name} must be an absolute URL.`);
+  }
+
+  const expectedPath = requiredPath || '/';
+  if (url.username || url.password || url.search || url.hash || url.pathname !== expectedPath) {
+    throw new Error(`${name} must be an origin${requiredPath ? ` ending in ${requiredPath}` : ''} without credentials, query, or fragment.`);
+  }
+  if (isProduction && url.protocol !== 'https:') {
+    throw new Error(`Production requires an HTTPS ${name}.`);
+  }
+  if (isProduction && /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(url.hostname)) {
+    throw new Error(`Production ${name} cannot use a loopback host.`);
+  }
+  return requiredPath ? `${url.origin}${requiredPath}` : url.origin;
 }
 
-const apiOrigin = originOf(process.env.NEXT_PUBLIC_API_URL);
-const socketOrigin = originOf(process.env.NEXT_PUBLIC_SOCKET_URL);
-if (process.env.VERCEL && (
-  !apiOrigin.startsWith('https://') ||
-  !socketOrigin.startsWith('https://') ||
-  /localhost|127\.0\.0\.1/.test(`${apiOrigin}${socketOrigin}`)
-)) {
-  throw new Error('Production requires HTTPS NEXT_PUBLIC_API_URL and NEXT_PUBLIC_SOCKET_URL values.');
-}
+const backendApiUrl = configuredUrl('NEXT_PUBLIC_API_URL', 'http://localhost:5000/api', '/api');
+const apiOrigin = new URL(backendApiUrl).origin;
+const socketOrigin = configuredUrl('NEXT_PUBLIC_SOCKET_URL', 'http://localhost:5000');
+configuredUrl('NEXT_PUBLIC_SITE_URL', 'http://localhost:3000');
 const websocketOrigin = socketOrigin.replace(/^http/, 'ws');
 const connectSources = ["'self'", apiOrigin, socketOrigin, websocketOrigin].filter(Boolean).join(' ');
+const scriptSources = ["'self'", "'unsafe-inline'", ...(!isProduction ? ["'unsafe-eval'"] : [])].join(' ');
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -22,13 +43,13 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
   "form-action 'self'",
   `connect-src ${connectSources}`,
-  "script-src 'self' 'unsafe-inline'",
+  `script-src ${scriptSources}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https://res.cloudinary.com https://images.unsplash.com https://plus.unsplash.com https://source.unsplash.com https://api.dicebear.com https://ui-avatars.com https://*.tile.openstreetmap.org",
+  "img-src 'self' data: blob: https://res.cloudinary.com https://*.tile.openstreetmap.org",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
-  ...(process.env.NODE_ENV === 'production' ? ['upgrade-insecure-requests'] : []),
+  ...(isProduction ? ['upgrade-insecure-requests'] : []),
 ].join('; ');
 
 /** @type {import('next').NextConfig} */
@@ -39,19 +60,16 @@ const nextConfig = {
   turbopack: { root: __dirname },
   outputFileTracingRoot: path.join(__dirname),
   images: {
+    // React/Next development runs in a restricted local process in some IDEs.
+    // Let the browser fetch Cloudinary directly there; production keeps the
+    // optimized Next image pipeline.
+    unoptimized: !isProduction,
     remotePatterns: [
       { protocol: 'https', hostname: 'res.cloudinary.com' },
-      { protocol: 'https', hostname: 'api.dicebear.com' },
-      { protocol: 'https', hostname: 'images.unsplash.com' },
-      { protocol: 'https', hostname: 'plus.unsplash.com' },
-      { protocol: 'https', hostname: 'source.unsplash.com' },
-      { protocol: 'https', hostname: 'ui-avatars.com' },
     ],
   },
   async rewrites() {
-    return process.env.NODE_ENV === 'development'
-      ? [{ source: '/api/:path*', destination: `${process.env.NEXT_PUBLIC_API_URL}/:path*` }]
-      : [];
+    return [{ source: '/api/:path*', destination: `${backendApiUrl}/:path*` }];
   },
   async headers() {
     return [{
@@ -63,7 +81,7 @@ const nextConfig = {
         { key: 'X-Frame-Options', value: 'DENY' },
         { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
         { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
-        ...(process.env.NODE_ENV === 'production'
+        ...(isProduction
           ? [{ key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' }]
           : []),
       ],

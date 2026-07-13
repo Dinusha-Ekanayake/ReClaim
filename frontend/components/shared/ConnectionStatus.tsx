@@ -5,7 +5,7 @@ import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
 
 type State = 'checking' | 'online' | 'offline' | 'restored';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL = '/api';
 
 export default function ConnectionStatus() {
   const [state, setState] = useState<State>('checking');
@@ -15,7 +15,9 @@ export default function ConnectionStatus() {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 5000);
     try {
-      const response = await fetch(`${API_URL}/health/ready`, { cache: 'no-store', signal: controller.signal });
+      // Browser connectivity uses the lightweight liveness endpoint. Database
+      // readiness is reserved for the deployment platform's health probe.
+      const response = await fetch(`${API_URL}/health`, { cache: 'no-store', signal: controller.signal });
       const next: State = response.ok ? (previous.current === 'offline' ? 'restored' : 'online') : 'offline';
       previous.current = response.ok ? 'online' : 'offline';
       setState(next);
@@ -30,7 +32,7 @@ export default function ConnectionStatus() {
 
   useEffect(() => {
     check();
-    const interval = window.setInterval(check, 30000);
+    const interval = window.setInterval(check, 120000);
     window.addEventListener('online', check);
     const offline = () => { previous.current = 'offline'; setState('offline'); };
     window.addEventListener('offline', offline);

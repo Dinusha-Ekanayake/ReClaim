@@ -1,122 +1,92 @@
-import PublicLayout from '@/components/layout/PublicLayout';
 import Link from 'next/link';
-import { Search, Zap, MessageSquare, CheckCircle, Shield, Star, ArrowRight } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  EyeOff,
+  Flag,
+  MessageSquare,
+  PackageCheck,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  WandSparkles,
+} from 'lucide-react';
+import PublicLayout from '@/components/layout/PublicLayout';
+
+const STEPS = [
+  {
+    icon: Search,
+    title: 'Create a useful report',
+    description: 'Choose lost or found, add an accurate description and date, then include photos when they help identify the item.',
+    points: ['A public area helps people search', 'An optional precise point improves private matching', 'Found reports include ownership questions'],
+  },
+  {
+    icon: WandSparkles,
+    title: 'Review potential matches',
+    description: 'ReClaim compares active counterpart reports using category, words, date, attributes, optional location, and semantic similarity when configured.',
+    points: ['Scores of 30 or more are retained as suggestions', 'Scores of 60 or more trigger match notifications', 'Suggestions are evidence, not proof of ownership'],
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Verify ownership privately',
+    description: 'For found items, a claimant answers the finder’s questions. Answers are visible to the finder and moderators, never on the public listing.',
+    points: ['Ask about a non-public marking or detail', 'Never request passwords or payment information', 'The finder can approve or reject the claim'],
+  },
+  {
+    icon: MessageSquare,
+    title: 'Coordinate a safe handover',
+    description: 'Use the item-linked ReClaim chat to agree on a safe public meeting point. A phone number appears only when both profile and report settings allow it.',
+    points: ['Chat keeps the item context attached', 'Failed messages can be retried without duplicate sends', 'Report suspicious content for moderator review'],
+  },
+  {
+    icon: CheckCircle2,
+    title: 'Record the outcome',
+    description: 'An approved claim marks the found report returned. Owners of active or matched reports can also close them or mark them returned.',
+    points: ['Pending claims must be reviewed first', 'Returned and closed states are final', 'Real outcomes power the public impact totals'],
+  },
+] as const;
 
 export default function HowItWorksPage() {
   return (
     <PublicLayout>
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-blue-50 to-green-50 dark:from-blue-950/30 dark:to-emerald-950/20 py-20 transition-colors duration-500">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl font-display font-bold text-gray-900 dark:text-white mb-6">How ReClaim Works</h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            A simple, secure, and smart system that helps reunite people with their lost belongings.
-          </p>
+      <section className="border-b border-slate-100 bg-gradient-to-br from-primary-50/90 via-white to-secondary-50/70 py-14 dark:border-slate-800 dark:from-primary-950/30 dark:via-slate-950 dark:to-secondary-950/20 sm:py-16">
+        <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
+          <p className="section-pill"><Sparkles size={13} aria-hidden="true" />From report to return</p>
+          <h1 className="mt-5 font-display text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-5xl">How ReClaim works</h1>
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-slate-600 dark:text-slate-300 sm:text-lg">A clear community workflow that separates useful public discovery from private ownership verification.</p>
         </div>
       </section>
 
-      {/* Steps */}
-      <section className="py-20 bg-white dark:bg-gray-950 transition-colors duration-500">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="space-y-16">
-            {[
-              {
-                step: '01', icon: <Search size={32} />, color: 'bg-blue-100 text-primary-600',
-                title: 'Post Your Item',
-                desc: 'Whether you lost something or found something, create a detailed post in under 2 minutes. Upload photos, describe the item, add the category, color, brand, and mark the approximate location on the map.',
-                tips: ['Be as specific as possible in your description', 'Add multiple photos from different angles', 'Mark the location accurately — even approximate areas help'],
-              },
-              {
-                step: '02', icon: <Zap size={32} />, color: 'bg-green-100 text-secondary-600',
-                title: 'AI-Powered Matching',
-                desc: 'Our smart matching system immediately starts comparing your post against all existing reports. It uses a combination of category matching, keyword similarity, location proximity, date closeness, and AI embeddings to calculate a match score.',
-                tips: ['Matches with 70%+ score send you an instant notification', 'The system re-runs matching whenever new items are posted', 'You can also manually refresh matches from your item page'],
-              },
-              {
-                step: '03', icon: <Shield size={32} />, color: 'bg-amber-100 text-amber-600',
-                title: 'Verified Claims (For Found Items)',
-                desc: 'When someone finds your lost item, they can post it as "Found." If you believe it\'s yours, you submit a claim — but here\'s the key: the finder sets hidden verification questions. You must answer correctly to prove ownership, preventing fake claims.',
-                tips: ['Hidden details like serial numbers or unique damage marks verify real owners', 'Claimants can also send a direct message explaining the situation', 'Finders review answers before approving or rejecting'],
-              },
-              {
-                step: '04', icon: <MessageSquare size={32} />, color: 'bg-purple-100 text-purple-600',
-                title: 'Secure In-App Chat',
-                desc: 'All communication happens inside ReClaim — never share personal contact info publicly. Our real-time chat lets both parties coordinate the handover safely. Optionally, item posters can choose to show their phone number for direct contact.',
-                tips: ['Your email and phone are never shown publicly by default', 'Message history is saved so you can refer back', 'Chat threads are linked to specific items for context'],
-              },
-              {
-                step: '05', icon: <CheckCircle size={32} />, color: 'bg-green-100 text-secondary-600',
-                title: 'Reunion & Closure',
-                desc: 'Once the item is returned, either the owner or finder marks it as "Returned." The item status updates, and the community grows stronger. Every successful return builds trust in ReClaim.',
-                tips: ['Both the owner and admin can mark items as returned', 'Returned items are archived and tracked for stats', 'Leave a comment to thank the finder!'],
-              },
-            ].map((s, i) => (
-              <div key={s.step} className={`flex flex-col ${i % 2 === 1 ? 'sm:flex-row-reverse' : 'sm:flex-row'} gap-8 items-start`}>
-                <div className="sm:w-1/3 flex-shrink-0">
-                  <div className="card p-8 text-center">
-                    <div className="text-xs font-mono font-bold text-gray-300 dark:text-gray-600 mb-3">{s.step}</div>
-                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${s.color} dark:bg-white/5`}>
-                      {s.icon}
-                    </div>
-                    <h2 className="font-display font-bold text-gray-900 dark:text-white">{s.title}</h2>
-                  </div>
+      <section className="bg-white/90 py-14 dark:bg-slate-950/90 sm:py-16" aria-label="ReClaim process">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <ol className="grid gap-5 lg:grid-cols-2">
+            {STEPS.map(({ icon: Icon, title, description, points }, index) => (
+              <li key={title} className={`rounded-3xl border border-slate-200 bg-white p-5 shadow-card dark:border-slate-800 dark:bg-slate-900 sm:p-6 ${index === STEPS.length - 1 ? 'lg:col-span-2' : ''}`}>
+                <div className="flex min-w-0 items-start gap-4">
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300"><Icon size={22} aria-hidden="true" /></span>
+                  <div className="min-w-0 flex-1"><div className="flex items-baseline justify-between gap-3"><h2 className="text-lg font-bold text-slate-950 dark:text-white">{title}</h2><span className="font-mono text-xs font-bold text-slate-300 dark:text-slate-600">0{index + 1}</span></div><p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{description}</p><ul className={`mt-4 grid gap-2 text-xs text-slate-500 dark:text-slate-400 ${index === STEPS.length - 1 ? 'sm:grid-cols-3' : ''}`}>{points.map((point) => <li key={point} className="flex items-start gap-2"><CheckCircle2 size={14} className="mt-0.5 shrink-0 text-secondary-500" aria-hidden="true" /><span>{point}</span></li>)}</ul></div>
                 </div>
-                <div className="flex-1 py-4">
-                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-5">{s.desc}</p>
-                  <ul className="space-y-2">
-                    {s.tips.map(tip => (
-                      <li key={tip} className="flex items-start gap-2 text-sm text-gray-500 dark:text-gray-400">
-                        <Star size={14} className="text-amber-400 flex-shrink-0 mt-0.5 fill-amber-400" />
-                        {tip}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 
-      {/* Safety */}
-      <section className="py-16 bg-gray-50 dark:bg-gray-900 transition-colors duration-500">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-display font-bold text-gray-900 dark:text-white mb-4">Safety & Privacy</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-10 max-w-xl mx-auto">
-            Your privacy is our priority. ReClaim is designed to connect people while keeping personal information protected.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <section className="bg-slate-50/80 py-14 dark:bg-slate-900/65 sm:py-16" aria-labelledby="safety-heading">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl"><h2 id="safety-heading" className="font-display text-3xl font-extrabold text-slate-950 dark:text-white">Safety and privacy by design</h2><p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">ReClaim reduces unnecessary exposure, but users should still choose safe handover locations and trust verified details—not pressure or payment requests.</p></div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
             {[
-              { icon: '🔒', title: 'Private by Default', desc: 'Phone numbers and emails are never shown publicly unless you choose to share them.' },
-              { icon: '✅', title: 'Verified Claims', desc: 'Hidden details prevent fraudulent ownership claims. Only the real owner knows.' },
-              { icon: '🛡️', title: 'Admin Moderation', desc: 'Our admin team reviews reports and can remove fake or inappropriate posts.' },
-            ].map(f => (
-              <div key={f.title} className="card p-6 text-center">
-                <div className="text-4xl mb-3">{f.icon}</div>
-                <h3 className="font-display font-bold text-gray-900 dark:text-white mb-2">{f.title}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{f.desc}</p>
-              </div>
-            ))}
+              { icon: EyeOff, title: 'Approximate public maps', text: 'Visitors see a softened area; the owner and moderators can see the precise report point.' },
+              { icon: ShieldCheck, title: 'Private claim answers', text: 'Ownership answers are restricted to the finder and moderators.' },
+              { icon: Flag, title: 'Moderation tools', text: 'Item concerns, claims, and user activity can be reviewed by authorized moderators.' },
+            ].map(({ icon: Icon, title, text }) => <div key={title} className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><Icon size={21} className="text-primary-600 dark:text-primary-300" aria-hidden="true" /><h3 className="mt-4 text-sm font-bold text-slate-950 dark:text-white">{title}</h3><p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{text}</p></div>)}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-16 bg-primary-600">
-        <div className="max-w-2xl mx-auto px-4 text-center">
-          <h2 className="text-3xl font-display font-bold text-white mb-4">Ready to get started?</h2>
-          <p className="text-blue-200 mb-8">Join thousands of people helping each other recover lost items.</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth/register"
-              className="px-8 py-4 bg-white text-primary-700 font-bold rounded-xl hover:bg-blue-50 transition-all">
-              Create Free Account
-            </Link>
-            <Link href="/items"
-              className="px-8 py-4 bg-primary-500 text-white font-bold rounded-xl border-2 border-white/30 hover:bg-primary-400 transition-all flex items-center justify-center gap-2">
-              Browse Items <ArrowRight size={18} />
-            </Link>
-          </div>
-        </div>
+      <section className="bg-white py-14 dark:bg-slate-950 sm:py-16">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8"><div className="flex flex-col gap-6 rounded-[2rem] bg-primary-700 p-6 text-white sm:p-9 lg:flex-row lg:items-center lg:justify-between"><div className="max-w-xl"><PackageCheck size={28} aria-hidden="true" /><h2 className="mt-4 font-display text-3xl font-extrabold">Help the next item get home</h2><p className="mt-2 text-sm leading-relaxed text-primary-100">Browse the live board or add an accurate community report.</p></div><div className="flex flex-col gap-3 sm:flex-row lg:shrink-0"><Link href="/items/new" className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-6 text-sm font-bold text-primary-800 hover:bg-primary-50">Post a report</Link><Link href="/items" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/10 px-6 text-sm font-bold text-white hover:bg-white/20">Browse reports<ArrowRight size={16} aria-hidden="true" /></Link></div></div></div>
       </section>
     </PublicLayout>
   );

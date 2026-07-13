@@ -1,148 +1,174 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import { useMemo, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { motion } from 'framer-motion';
-import { X, Shield, AlertCircle } from 'lucide-react';
+import { AlertCircle, ShieldCheck, X } from 'lucide-react';
 import api, { ApiError } from '@/lib/api';
 
 interface ClaimModalProps {
-  item: any;
+  item: {
+    id: string;
+    title: string;
+    verificationQuestions?: string[];
+  };
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function ClaimModal({ item, onClose, onSuccess }: ClaimModalProps) {
+const FALLBACK_QUESTIONS = [
+  'Describe a detail or marking that is not visible in the listing photos.',
+  'Where and when did you last have this item?',
+  'What else would help the finder confirm that this belongs to you?',
+];
+
+export default function ClaimModal({ item, onClose, onSuccess }: Readonly<ClaimModalProps>) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [onClose]);
+  const questions = useMemo(() => {
+    const configured = item.verificationQuestions?.map((question) => question.trim()).filter(Boolean);
+    return configured?.length ? configured : FALLBACK_QUESTIONS;
+  }, [item.verificationQuestions]);
 
-  // Generate verification questions based on item type/category
-  const questions = [
-    'What is the exact color and brand of this item?',
-    'Describe any unique markings, stickers, or damage on this item.',
-    'What was inside the item when you last had it? (e.g. wallet contents, bag contents)',
-    'Where exactly did you last have this item?',
-  ].slice(0, 3);
-
-  const handleSubmit = async () => {
-    if (Object.keys(answers).length < questions.length || Object.values(answers).some(a => !a.trim())) {
-      setError('Please answer all verification questions.');
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const complete = questions.every((_, index) => answers[`q${index}`]?.trim());
+    if (!complete) {
+      setError('Please answer every ownership question.');
       return;
     }
+
     setLoading(true);
     setError('');
     try {
       await api.post('/claims', {
         itemId: item.id,
-        verificationAnswers: answers,
+        verificationAnswers: Object.fromEntries(
+          questions.map((_, index) => [`q${index}`, answers[`q${index}`].trim()]),
+        ),
         message: message.trim() || undefined,
       });
       onSuccess();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to submit claim. Please try again.');
+      setError(err instanceof ApiError ? err.message : 'The claim could not be submitted. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="claim-dialog-title"
-        initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        onClick={e => e.stopPropagation()}
-        className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl border border-transparent dark:border-gray-800"
-      >
-        <div className="sticky top-0 bg-white dark:bg-gray-900 flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 z-10">
-          <div>
-            <h2 id="claim-dialog-title" className="font-display font-bold text-gray-900 dark:text-white">Claim This Item</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{item.title}</p>
-          </div>
-          <button onClick={onClose} aria-label="Close claim dialog" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors text-gray-500 dark:text-gray-400">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-5">
-          {/* Info box */}
-          <div className="flex gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 rounded-xl border border-amber-100 dark:border-amber-500/20">
-            <Shield size={20} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Ownership Verification Required</p>
-              <p className="text-xs text-amber-700 dark:text-amber-400/80 mt-1">
-                Answer the questions below to verify you're the rightful owner. Your answers will be reviewed by the finder.
-              </p>
+    <Dialog.Root open onOpenChange={(open) => { if (!open && !loading) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay asChild>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm"
+          />
+        </Dialog.Overlay>
+        <Dialog.Content asChild onEscapeKeyDown={(event) => { if (loading) event.preventDefault(); }}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed left-1/2 top-1/2 z-50 max-h-[min(90dvh,760px)] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl outline-none dark:border-slate-700 dark:bg-slate-900"
+          >
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 p-5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 sm:p-6">
+              <div className="min-w-0">
+                <Dialog.Title className="font-display text-xl font-bold text-slate-950 dark:text-white">
+                  Verify your ownership
+                </Dialog.Title>
+                <Dialog.Description className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">
+                  Claiming “{item.title}”
+                </Dialog.Description>
+              </div>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  disabled={loading}
+                  aria-label="Close claim dialog"
+                  className="flex size-11 flex-shrink-0 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50 dark:hover:bg-slate-800 dark:hover:text-white"
+                >
+                  <X size={20} aria-hidden="true" />
+                </button>
+              </Dialog.Close>
             </div>
-          </div>
 
-          {/* Questions */}
-          {questions.map((q, i) => (
-            <div key={i}>
-              <label htmlFor={`claim-answer-${i}`} className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                {i + 1}. {q}
-              </label>
-              <textarea
-                id={`claim-answer-${i}`}
-                value={answers[`q${i}`] || ''}
-                onChange={e => setAnswers(prev => ({ ...prev, [`q${i}`]: e.target.value }))}
-                rows={2}
-                maxLength={500}
-                className="input-field resize-none"
-                placeholder="Your answer..."
-              />
-            </div>
-          ))}
+            <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
+              <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+                <ShieldCheck size={21} className="mt-0.5 flex-shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-bold text-amber-900 dark:text-amber-200">Answers go only to the finder and moderators</p>
+                  <p className="mt-1 text-xs leading-relaxed text-amber-800 dark:text-amber-300/90">
+                    Do not post passwords, payment details, or identity-document numbers. Give only enough private detail to prove ownership.
+                  </p>
+                </div>
+              </div>
 
-          {/* Message */}
-          <div>
-            <label htmlFor="claim-message" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Additional Message <span className="text-gray-400 dark:text-gray-500 font-normal">(optional)</span>
-            </label>
-            <textarea
-              id="claim-message"
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-              rows={3}
-              maxLength={500}
-              className="input-field resize-none"
-              placeholder="Anything else you'd like the finder to know..."
-            />
-          </div>
+              {questions.map((question, index) => {
+                const id = `claim-answer-${index}`;
+                return (
+                  <div key={`${index}-${question}`}>
+                    <label htmlFor={id} className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      {index + 1}. {question}
+                    </label>
+                    <textarea
+                      id={id}
+                      value={answers[`q${index}`] || ''}
+                      onChange={(event) => setAnswers((current) => ({ ...current, [`q${index}`]: event.target.value }))}
+                      rows={2}
+                      maxLength={500}
+                      required
+                      className="input-field resize-none"
+                      placeholder="Your private answer"
+                    />
+                  </div>
+                );
+              })}
 
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 rounded-xl text-sm">
-              <AlertCircle size={16} /> {error}
-            </motion.div>
-          )}
-        </div>
+              <div>
+                <label htmlFor="claim-message" className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Message <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <textarea
+                  id="claim-message"
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  rows={3}
+                  maxLength={500}
+                  className="input-field resize-none"
+                  placeholder="Add safe handover context for the finder"
+                />
+              </div>
 
-        <div className="p-6 pt-0 flex gap-3">
-          <button onClick={onClose} className="flex-1 btn-outline">Cancel</button>
-          <button onClick={handleSubmit} disabled={loading} className="flex-1 btn-primary disabled:opacity-60">
-            {loading ? 'Submitting...' : 'Submit Claim'}
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
+              {error && (
+                <motion.div
+                  role="alert"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
+                >
+                  <AlertCircle size={17} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+                  <span>{error}</span>
+                </motion.div>
+              )}
+
+              <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
+                <Dialog.Close asChild>
+                  <button type="button" disabled={loading} className="btn-outline sm:min-w-32">Cancel</button>
+                </Dialog.Close>
+                <button type="submit" disabled={loading} className="btn-primary sm:min-w-44">
+                  {loading ? 'Submitting claim…' : 'Submit for review'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

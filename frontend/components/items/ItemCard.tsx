@@ -1,153 +1,72 @@
 'use client';
-import Link from 'next/link';
-import Image from 'next/image';
-import { MapPin, Calendar, MessageSquare, ArrowRight } from 'lucide-react';
-import { cn, timeAgo, getStatusColor, getStatusLabel, truncate } from '@/lib/utils';
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  Electronics: '📱', 'Bags & Wallets': '👜', 'Clothing & Accessories': '👗',
-  Jewelry: '💍', Keys: '🔑', 'Documents & Cards': '📄',
-  'Books & Stationery': '📚', 'Sports Equipment': '⚽', Pets: '🐾',
-  Vehicles: '🚗', 'Musical Instruments': '🎸', 'Toys & Games': '🎮', Other: '📦',
-};
+import Image from 'next/image';
+import Link from 'next/link';
+import { ArrowUpRight, Calendar, ImageIcon, MapPin, MessageSquare, PackageCheck, Search } from 'lucide-react';
+import { cn, getAvatarFallback, getStatusColor, getStatusLabel, timeAgo, truncate } from '@/lib/utils';
+import type { Item } from '@/types';
 
 interface ItemCardProps {
-  item: any;
+  item: Item;
   showStatus?: boolean;
   className?: string;
   variant?: 'grid' | 'list';
 }
 
-export default function ItemCard({ item, showStatus = false, className, variant = 'grid' }: ItemCardProps) {
+export default function ItemCard({ item, showStatus = false, className, variant = 'grid' }: Readonly<ItemCardProps>) {
   const primaryImage = item.images?.[0]?.url;
   const isLost = item.type === 'LOST';
-  const catEmoji = CATEGORY_EMOJI[item.category] ?? '📦';
+  const isList = variant === 'list';
 
   return (
-    <Link href={`/items/${item.id}`}
+    <Link
+      href={`/items/${item.id}`}
       className={cn(
-        'group block bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden',
-        'shadow-sm hover:shadow-xl dark:shadow-black/20 dark:hover:shadow-black/40 hover:-translate-y-1.5',
-        'transition-all duration-300',
-        variant === 'list' && 'sm:flex sm:min-h-52 hover:-translate-y-0 hover:-translate-x-1',
-        className
-      )}>
-
-      {/* ── Image area ─────────────────────────────────────────── */}
-      <div className={cn('relative h-48 overflow-hidden bg-gray-50 dark:bg-gray-800', variant === 'list' && 'sm:h-auto sm:w-64 sm:flex-shrink-0')}>
+        'group block min-w-0 overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-card transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-card-hover dark:border-slate-800 dark:bg-slate-900 dark:hover:border-primary-500/30',
+        isList && 'sm:flex sm:min-h-48 sm:hover:translate-y-0',
+        className,
+      )}
+    >
+      <div className={cn('relative aspect-[4/3] min-h-44 overflow-hidden bg-slate-100 dark:bg-slate-800', isList && 'sm:aspect-auto sm:min-h-full sm:w-56 sm:shrink-0')}>
         {primaryImage ? (
-          <Image
-            src={primaryImage}
-            alt={item.title}
-            fill
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
-          />
+          <Image src={primaryImage} alt={item.title} fill sizes={isList ? '(max-width: 640px) 100vw, 224px' : '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw'} className="object-cover transition-transform duration-500 group-hover:scale-[1.025]" />
         ) : (
-          /* Placeholder with category colour */
-          <div className={cn(
-            'h-full flex flex-col items-center justify-center gap-2',
-            isLost ? 'bg-red-50 dark:bg-red-500/10' : 'bg-emerald-50 dark:bg-emerald-500/10'
-          )}>
-            <span className="text-5xl">{catEmoji}</span>
-            <span className="text-xs font-medium text-gray-400 dark:text-gray-500">{item.category}</span>
+          <div className={cn('flex h-full min-h-44 flex-col items-center justify-center gap-2', isLost ? 'bg-red-50 text-red-400 dark:bg-red-500/10 dark:text-red-300' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300')}>
+            <ImageIcon size={38} strokeWidth={1.5} aria-hidden="true" />
+            <span className="text-xs font-semibold">No photo</span>
           </div>
         )}
 
-        {/* Bottom gradient fade so badges pop on busy images */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent
-                        opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-        {/* LOST / FOUND pill */}
-        <span className={cn(
-          'absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-sm',
-          isLost
-            ? 'bg-red-500 text-white shadow-red-200'
-            : 'bg-emerald-500 text-white shadow-emerald-200'
-        )}>
-          {isLost ? '🔍 LOST' : '📦 FOUND'}
+        <span className={cn('absolute left-3 top-3 inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-extrabold tracking-wide text-white shadow-sm', isLost ? 'bg-red-500' : 'bg-emerald-600')}>
+          {isLost ? <Search size={13} aria-hidden="true" /> : <PackageCheck size={13} aria-hidden="true" />}
+          {isLost ? 'Lost' : 'Found'}
         </span>
 
-        {/* Status badge (dashboard / owner view) */}
-        {showStatus && item.status !== 'ACTIVE' && (
-          <span className={cn(
-            'absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-semibold shadow-sm',
-            getStatusColor(item.status)
-          )}>
-            {getStatusLabel(item.status)}
-          </span>
-        )}
-
-        {/* Hover overlay arrow */}
-        <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100
-                        transition-all duration-300 translate-y-1 group-hover:translate-y-0">
-          <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md">
-            <ArrowRight size={14} className="text-gray-700" />
-          </div>
-        </div>
+        {showStatus && item.status !== 'ACTIVE' && <span className={cn('absolute right-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold shadow-sm', getStatusColor(item.status))}>{getStatusLabel(item.status)}</span>}
       </div>
 
-      {/* ── Content ────────────────────────────────────────────── */}
-      <div className={cn('p-4', variant === 'list' && 'sm:flex-1 sm:p-6')}>
-        {/* Title + category */}
-        <div className="flex items-start justify-between gap-2 mb-1.5">
-          <h3 className="font-display font-semibold text-gray-900 dark:text-white text-sm leading-snug
-                         line-clamp-1 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-            {item.title}
-          </h3>
-          <span className="flex-shrink-0 text-[11px] font-medium text-gray-500 dark:text-gray-400
-                           bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full leading-5">
-            {item.category}
+      <div className={cn('flex min-w-0 flex-col p-4', isList && 'sm:flex-1 sm:p-5')}>
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-300">{item.category}</p>
+            <h3 className="mt-1 line-clamp-2 break-words font-display text-base font-bold leading-snug text-slate-950 transition-colors group-hover:text-primary-700 dark:text-white dark:group-hover:text-primary-300">{item.title}</h3>
+          </div>
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-colors group-hover:bg-primary-50 group-hover:text-primary-700 dark:bg-slate-800 dark:group-hover:bg-primary-500/10 dark:group-hover:text-primary-300" aria-hidden="true"><ArrowUpRight size={16} /></span>
+        </div>
+
+        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{truncate(item.description, isList ? 150 : 100)}</p>
+
+        <div className="mt-4 space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
+          <span className="flex min-w-0 items-center gap-1.5"><MapPin size={13} className="shrink-0 text-primary-400" aria-hidden="true" /><span className="truncate">{item.locationArea || item.locationLabel}</span></span>
+          <span className="flex items-center gap-1.5"><Calendar size={13} className="shrink-0 text-primary-400" aria-hidden="true" /><span>{timeAgo(item.dateLostFound)}</span></span>
+        </div>
+
+        <div className="mt-auto flex min-w-0 items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <span className="flex min-w-0 items-center gap-2">
+            {item.user?.avatarUrl ? <Image src={item.user.avatarUrl} alt="" width={26} height={26} className="size-6 shrink-0 rounded-full object-cover" /> : <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-100 text-[9px] font-bold text-primary-700 dark:bg-primary-500/20 dark:text-primary-300">{getAvatarFallback(item.user?.name)}</span>}
+            <span className="truncate text-xs font-semibold text-slate-600 dark:text-slate-300">{item.user?.name || 'Community member'}</span>
           </span>
-        </div>
-
-        {/* Description */}
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-3.5 line-clamp-2 leading-relaxed">
-          {truncate(item.description, 90)}
-        </p>
-
-        {/* Meta */}
-        <div className="space-y-1.5 text-xs text-gray-400">
-          <div className="flex items-center gap-1.5">
-            <MapPin size={11} className="flex-shrink-0 text-gray-300" />
-            <span className="truncate">{item.locationLabel}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Calendar size={11} className="flex-shrink-0 text-gray-300" />
-            <span>{timeAgo(item.dateLostFound)}</span>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-3.5 pt-3 border-t border-gray-50 dark:border-gray-800 flex items-center justify-between">
-          {/* User avatar + name */}
-          <div className="flex items-center gap-2">
-            {item.user?.avatarUrl ? (
-              <Image src={item.user.avatarUrl} alt={item.user.name}
-                width={22} height={22} className="rounded-full object-cover ring-1 ring-gray-100" />
-            ) : (
-              <div className="w-[22px] h-[22px] rounded-full bg-primary-100 text-primary-600
-                              text-[9px] flex items-center justify-center font-bold ring-1 ring-gray-100">
-                {item.user?.name?.[0]?.toUpperCase() ?? 'U'}
-              </div>
-            )}
-            <span className="text-xs text-gray-500 font-medium truncate max-w-[80px]">
-              {item.user?.name}
-            </span>
-          </div>
-
-          {/* Comments + view */}
-          <div className="flex items-center gap-3 text-gray-400">
-            {item._count?.comments > 0 && (
-              <span className="flex items-center gap-1 text-xs">
-                <MessageSquare size={11} />
-                {item._count.comments}
-              </span>
-            )}
-            <span className="text-xs text-primary-600 font-semibold
-                             group-hover:underline group-hover:text-primary-700 transition-colors">
-              View →
-            </span>
-          </div>
+          {!!item._count?.comments && <span className="flex shrink-0 items-center gap-1 text-xs text-slate-400" aria-label={`${item._count.comments} comments`}><MessageSquare size={13} aria-hidden="true" />{item._count.comments}</span>}
         </div>
       </div>
     </Link>

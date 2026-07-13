@@ -36,10 +36,10 @@ export default function AdminItemsPage() {
 
   useEffect(() => { fetchItems(); }, [search, typeFilter, approvedFilter, page]);
 
-  const handleApprove = async (id: string, approved: boolean) => {
+  const handleApprove = async (id: string, approved: boolean, contentRevision: number) => {
     try {
-      await api.patch(`/admin/items/${id}/approve`, { isApproved: approved });
-      setItems(prev => prev.map(i => i.id === id ? { ...i, isApproved: approved } : i));
+      const updated = await api.patch(`/admin/items/${id}/approve`, { isApproved: approved, contentRevision });
+      setItems(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i));
     } catch (error: any) {
       toast({ title: 'Could not update approval', description: error.message, variant: 'destructive' });
     }
@@ -166,7 +166,7 @@ export default function AdminItemsPage() {
                       className="p-1.5 text-gray-500 hover:text-white transition-colors">
                       <ExternalLink size={15} />
                     </Link>
-                    <button onClick={() => handleApprove(item.id, !item.isApproved)}
+                    <button onClick={() => handleApprove(item.id, !item.isApproved, item.contentRevision)}
                       className={cn('p-1.5 transition-colors',
                         item.isApproved ? 'text-gray-500 hover:text-red-400' : 'text-gray-500 hover:text-green-400')}>
                       {item.isApproved ? <XCircle size={15} /> : <CheckCircle size={15} />}

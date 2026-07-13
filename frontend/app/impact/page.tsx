@@ -1,218 +1,299 @@
 'use client';
+
 import { useEffect, useState } from 'react';
-import PublicLayout from '@/components/layout/PublicLayout';
 import Link from 'next/link';
 import {
-  Package, CheckCircle, Search, Users, TrendingUp,
-  Clock, Award, Heart, ArrowRight, BarChart2,
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  CheckCircle2,
+  Clock3,
+  Package,
+  PackageOpen,
+  RefreshCw,
+  Search,
+  Users,
 } from 'lucide-react';
+import PublicLayout from '@/components/layout/PublicLayout';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-// ── Animated counter ──────────────────────────────────────────────────────────
-function AnimatedNumber({ target, suffix = '', duration = 1800 }:
-  { target: number; suffix?: string; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const [started, setStarted] = useState(false);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => setStarted(true), 200);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  useEffect(() => {
-    if (!started || target === 0) return;
-    let raf: number;
-    const start = performance.now();
-    const step = (now: number) => {
-      const t = Math.min((now - start) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      setCount(Math.round(ease * target));
-      if (t < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [target, duration, started]);
-
-  return <>{count.toLocaleString()}{suffix}</>;
+interface CommunityStats {
+  users: {
+    total: number;
+    newThisWeek: number;
+  };
+  items: {
+    total: number;
+    lost: number;
+    found: number;
+    returned: number;
+    active: number;
+    newThisWeek: number;
+  };
+  successRate: number;
 }
 
-// ── Progress bar ─────────────────────────────────────────────────────────────
-function ProgressBar({ label, value, max, color, icon }:
-  { label: string; value: number; max: number; color: string; icon: React.ReactNode }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isCount(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) >= 0;
+}
+
+function validateStats(value: unknown): CommunityStats {
+  if (!isRecord(value) || !isRecord(value.users) || !isRecord(value.items)) {
+    throw new Error('The statistics response was incomplete.');
+  }
+
+  const counts = [
+    value.users.total,
+    value.users.newThisWeek,
+    value.items.total,
+    value.items.lost,
+    value.items.found,
+    value.items.returned,
+    value.items.active,
+    value.items.newThisWeek,
+  ];
+
+  if (!counts.every(isCount) || !isCount(value.successRate) || value.successRate > 100) {
+    throw new Error('The statistics response contained invalid values.');
+  }
+
+  return value as unknown as CommunityStats;
+}
+
+function StatSkeleton() {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <div className="skeleton size-10 rounded-xl" />
+      <div className="skeleton mt-5 h-8 w-20 rounded-lg" />
+      <div className="skeleton mt-2 h-4 w-28 rounded" />
+    </div>
+  );
+}
+
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  suffix,
+  tone = 'primary',
+}: {
+  icon: typeof Package;
+  label: string;
+  value: number;
+  suffix?: string;
+  tone?: 'primary' | 'found';
+}) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div
+        className={cn(
+          'flex size-10 items-center justify-center rounded-xl',
+          tone === 'found'
+            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+            : 'bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300',
+        )}
+      >
+        <Icon size={20} aria-hidden="true" />
+      </div>
+      <p className="mt-4 font-display text-3xl font-extrabold tabular-nums text-slate-950 dark:text-white">
+        {value.toLocaleString()}{suffix}
+      </p>
+      <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
+    </article>
+  );
+}
+
+function BreakdownRow({
+  icon: Icon,
+  label,
+  value,
+  total,
+  tone,
+}: {
+  icon: typeof Package;
+  label: string;
+  value: number;
+  total: number;
+  tone: 'lost' | 'found' | 'primary';
+}) {
+  const percentage = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
+  const toneClasses = {
+    lost: 'bg-red-500 text-red-600 dark:text-red-400',
+    found: 'bg-emerald-600 text-emerald-700 dark:text-emerald-300',
+    primary: 'bg-primary-600 text-primary-700 dark:text-primary-300',
+  }[tone];
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-          {icon} {label}
-        </div>
-        <span className="text-sm font-bold text-gray-900 dark:text-white">{value.toLocaleString()}</span>
+      <div className="mb-2 flex items-center justify-between gap-4 text-sm">
+        <span className={cn('inline-flex min-w-0 items-center gap-2 font-semibold', toneClasses.split(' ').slice(1).join(' '))}>
+          <Icon size={16} className="shrink-0" aria-hidden="true" />
+          <span className="truncate">{label}</span>
+        </span>
+        <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-slate-700 dark:text-slate-200">
+          {value.toLocaleString()} <span className="font-sans font-medium text-slate-400">({percentage}%)</span>
+        </span>
       </div>
-      <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3 overflow-hidden">
-        <div
-          className={cn('h-3 rounded-full transition-all duration-1000 ease-out', color)}
-          style={{ width: `${pct}%` }}
-        />
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden="true">
+        <div className={cn('h-full rounded-full', toneClasses.split(' ')[0])} style={{ width: `${percentage}%` }} />
       </div>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{pct}% of total</p>
     </div>
   );
 }
 
 export default function ImpactPage() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<CommunityStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [requestKey, setRequestKey] = useState(0);
 
   useEffect(() => {
-    api.get('/stats').then(setStats)
-      .catch(() => setError('Live community statistics are temporarily unavailable.'))
-      .finally(() => setLoading(false));
-  }, []);
+    const controller = new AbortController();
 
-  const total    = stats?.items?.total    ?? 0;
-  const lost     = stats?.items?.lost     ?? 0;
-  const found    = stats?.items?.found    ?? 0;
-  const returned = stats?.items?.returned ?? 0;
-  const active   = stats?.items?.active   ?? 0;
-  const users    = stats?.users?.total    ?? 0;
-  const rate     = stats?.successRate     ?? 0;
-  const newUsers = stats?.users?.newThisWeek ?? 0;
-  const newItems = stats?.items?.newThisWeek ?? 0;
+    setLoading(true);
+    setError('');
+
+    api.get<unknown>('/stats', undefined, { signal: controller.signal })
+      .then((data) => {
+        if (!controller.signal.aborted) setStats(validateStats(data));
+      })
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) return;
+        setStats(null);
+        setError(
+          requestError instanceof Error && requestError.message.startsWith('The statistics response')
+            ? requestError.message
+            : 'Live community statistics are unavailable right now.',
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [requestKey]);
+
+  const retry = () => setRequestKey((key) => key + 1);
+  const hasActivity = Boolean(stats && (stats.items.total > 0 || stats.users.total > 0));
 
   return (
     <PublicLayout>
-      {error && <div role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">{error}</div>}
-      {/* ── Hero ──────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-blue-900 text-white py-20 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/15 rounded-full text-sm font-semibold mb-6 border border-white/20">
-            <BarChart2 size={14} /> Community Impact
+      <header className="border-b border-slate-200/80 bg-white/70 px-4 py-10 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/60 sm:py-12">
+        <div className="mx-auto max-w-5xl">
+          <div className="inline-flex min-h-8 items-center gap-2 rounded-full bg-primary-50 px-3 text-xs font-bold uppercase tracking-[0.14em] text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
+            <BarChart3 size={14} aria-hidden="true" />
+            Community impact
           </div>
-          <h1 className="text-5xl sm:text-6xl font-display font-extrabold mb-5 tracking-tight">
-            Real Stories.<br />Real Impact.
-          </h1>
-          <p className="text-blue-200 text-lg max-w-xl mx-auto leading-relaxed">
-            Live totals from the ReClaim community, updated as members report and return items.
-          </p>
-        </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-
-        {/* ── Hero stats ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-          {[
-            { icon: <Package size={24} className="text-primary-600" />, label: 'Total Items', value: total, suffix: '', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-100 dark:border-blue-500/20' },
-            { icon: <CheckCircle size={24} className="text-emerald-600" />, label: 'Items Returned', value: returned, suffix: '', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-100 dark:border-emerald-500/20' },
-            { icon: <Users size={24} className="text-amber-600" />, label: 'Community Members', value: users, suffix: '', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-100 dark:border-amber-500/20' },
-            { icon: <Award size={24} className="text-purple-600" />, label: 'Success Rate', value: rate, suffix: '%', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-100 dark:border-purple-500/20' },
-          ].map(s => (
-            <div key={s.label}
-              className={cn('card p-6 text-center border', s.border, loading && 'animate-pulse')}>
-              <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4', s.bg)}>
-                {s.icon}
-              </div>
-              <div className="text-4xl font-display font-extrabold text-gray-900 dark:text-white mb-1">
-                {loading ? '—' : <AnimatedNumber target={s.value} suffix={s.suffix} />}
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{s.label}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
-          {/* ── Item Breakdown ──────────────────────────────────── */}
-          <div className="card p-8">
-            <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-              <BarChart2 size={20} className="text-primary-600" /> Item Breakdown
-            </h2>
-            {loading ? (
-              <div className="space-y-6">{[...Array(4)].map((_, i) => <div key={i} className="skeleton h-8 rounded-xl" />)}</div>
-            ) : (
-              <div className="space-y-6">
-                <ProgressBar label="Lost Items" value={lost} max={total} color="bg-red-400" icon={<Search size={14} className="text-red-400" />} />
-                <ProgressBar label="Found Items" value={found} max={total} color="bg-emerald-400" icon={<Package size={14} className="text-emerald-400" />} />
-                <ProgressBar label="Returned" value={returned} max={total} color="bg-blue-500" icon={<CheckCircle size={14} className="text-blue-500" />} />
-                <ProgressBar label="Still Active" value={active} max={total} color="bg-amber-400" icon={<Clock size={14} className="text-amber-400" />} />
-              </div>
-            )}
-          </div>
-
-          {/* ── Donut-style visual ──────────────────────────────── */}
-          <div className="card p-8 flex flex-col items-center justify-center">
-            <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-6 self-start flex items-center gap-2">
-              <TrendingUp size={20} className="text-emerald-600" /> Return Rate
-            </h2>
-
-            {/* Big circle stat */}
-            <div className="relative w-48 h-48 mb-6">
-              <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                <circle cx="18" cy="18" r="15.9" fill="none" className="stroke-gray-100 dark:stroke-gray-800" strokeWidth="3.8" />
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#10b981" strokeWidth="3.8"
-                  strokeDasharray={`${loading ? 0 : rate} ${100 - (loading ? 0 : rate)}`}
-                  strokeLinecap="round"
-                  style={{ transition: 'stroke-dasharray 1.4s cubic-bezier(0.16,1,0.3,1)' }} />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-display font-extrabold text-gray-900 dark:text-white">
-                  {loading ? '—' : `${rate}%`}
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Success rate</span>
-              </div>
-            </div>
-
-            <p className="text-center text-sm text-gray-500 dark:text-gray-400 max-w-xs leading-relaxed">
-              <strong className="text-gray-900 dark:text-white">{returned.toLocaleString()} items</strong> have been successfully returned to their owners through ReClaim.
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_24rem] lg:items-end lg:gap-10">
+            <h1 className="font-display text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-5xl">
+              Progress you can verify.
+            </h1>
+            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300 sm:text-base">
+              These totals come directly from ReClaim&apos;s public community statistics and update as reports move through the return process.
             </p>
           </div>
         </div>
+      </header>
 
-        {/* ── This week ─────────────────────────────────────────── */}
-        <div className="bg-gradient-to-r from-primary-50 to-emerald-50 dark:from-primary-500/10 dark:to-emerald-500/10 rounded-2xl border border-primary-100 dark:border-primary-500/20 p-8 mb-16">
-          <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-            <Clock size={20} className="text-primary-600" /> Activity This Week
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {[
-              { label: 'New users joined', value: newUsers, icon: <Users size={20} className="text-blue-600" />, bg: 'bg-blue-100 dark:bg-blue-500/20' },
-              { label: 'New items posted', value: newItems, icon: <Package size={20} className="text-emerald-600" />, bg: 'bg-emerald-100 dark:bg-emerald-500/20' },
-              { label: 'Items still active', value: active, icon: <Search size={20} className="text-amber-600" />, bg: 'bg-amber-100 dark:bg-amber-500/20' },
-            ].map(s => (
-              <div key={s.label} className="bg-white dark:bg-gray-900 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
-                <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0', s.bg)}>
-                  {s.icon}
-                </div>
-                <div>
-                  <div className="text-2xl font-display font-bold text-gray-900 dark:text-white">
-                    {loading ? '—' : s.value.toLocaleString()}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">{s.label}</div>
-                </div>
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+        {loading && (
+          <div aria-label="Loading community statistics" role="status" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <span className="sr-only">Loading community statistics</span>
+            {Array.from({ length: 4 }, (_, index) => <StatSkeleton key={index} />)}
+          </div>
+        )}
+
+        {!loading && error && (
+          <section role="alert" className="rounded-3xl border border-red-200 bg-white p-6 shadow-sm dark:border-red-500/20 dark:bg-slate-900 sm:flex sm:items-center sm:justify-between sm:gap-6">
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300">
+                <AlertTriangle size={20} aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="font-display text-lg font-bold text-slate-950 dark:text-white">We could not load the live totals</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{error} No placeholder numbers are being shown.</p>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+            <button type="button" onClick={retry} className="btn-outline mt-5 inline-flex w-full items-center justify-center gap-2 sm:mt-0 sm:w-auto sm:shrink-0">
+              <RefreshCw size={16} aria-hidden="true" />
+              Try again
+            </button>
+          </section>
+        )}
 
-        {/* ── CTA ───────────────────────────────────────────────── */}
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-500/10 mb-6">
-            <Heart size={28} className="text-red-500 fill-red-500" />
-          </div>
-          <h3 className="text-3xl font-display font-bold text-gray-900 dark:text-white mb-4">Be part of the story</h3>
-          <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-8">
-            Every item you report adds to the impact. Help someone find what they've lost today.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/items/new?type=LOST" className="btn-primary inline-flex items-center gap-2">
-              🔍 Report Lost Item <ArrowRight size={16} />
-            </Link>
-            <Link href="/items" className="btn-outline inline-flex items-center gap-2">
-              Browse All Items <ArrowRight size={16} />
-            </Link>
-          </div>
-        </div>
+        {!loading && stats && (
+          <>
+            <section aria-label="Community totals" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <MetricCard icon={Package} label="Approved public reports" value={stats.items.total} />
+              <MetricCard icon={CheckCircle2} label="Items marked returned" value={stats.items.returned} tone="found" />
+              <MetricCard icon={Users} label="Registered members" value={stats.users.total} />
+              <MetricCard icon={BarChart3} label="Return rate" value={stats.successRate} suffix="%" tone="found" />
+            </section>
+
+            {!hasActivity && (
+              <section role="status" className="mt-4 flex items-start gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+                <PackageOpen size={20} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" />
+                <div>
+                  <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">No community activity yet</h2>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">The counters will update when the first member or approved report is recorded.</p>
+                </div>
+              </section>
+            )}
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6" aria-labelledby="breakdown-title">
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <div>
+                    <h2 id="breakdown-title" className="font-display text-xl font-bold text-slate-950 dark:text-white">Report breakdown</h2>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Each percentage uses all approved public reports as its base.</p>
+                  </div>
+                  <BarChart3 size={21} className="shrink-0 text-primary-600 dark:text-primary-300" aria-hidden="true" />
+                </div>
+                <div className="space-y-5">
+                  <BreakdownRow icon={Search} label="Lost reports" value={stats.items.lost} total={stats.items.total} tone="lost" />
+                  <BreakdownRow icon={Package} label="Found reports" value={stats.items.found} total={stats.items.total} tone="found" />
+                  <BreakdownRow icon={CheckCircle2} label="Returned reports" value={stats.items.returned} total={stats.items.total} tone="found" />
+                  <BreakdownRow icon={Clock3} label="Currently active" value={stats.items.active} total={stats.items.total} tone="primary" />
+                </div>
+              </section>
+
+              <aside className="rounded-3xl bg-primary-700 p-5 text-white shadow-sm sm:p-6" aria-labelledby="week-title">
+                <Clock3 size={22} className="text-primary-100" aria-hidden="true" />
+                <h2 id="week-title" className="mt-4 font-display text-xl font-bold">Last seven days</h2>
+                <dl className="mt-5 divide-y divide-white/15">
+                  <div className="flex items-center justify-between gap-4 py-3">
+                    <dt className="text-sm text-primary-100">New accounts</dt>
+                    <dd className="font-mono text-lg font-bold tabular-nums">{stats.users.newThisWeek.toLocaleString()}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 py-3">
+                    <dt className="text-sm text-primary-100">New approved reports</dt>
+                    <dd className="font-mono text-lg font-bold tabular-nums">{stats.items.newThisWeek.toLocaleString()}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 py-3">
+                    <dt className="text-sm text-primary-100">Active reports now</dt>
+                    <dd className="font-mono text-lg font-bold tabular-nums">{stats.items.active.toLocaleString()}</dd>
+                  </div>
+                </dl>
+              </aside>
+            </div>
+
+            <section className="mt-4 flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between" aria-labelledby="impact-cta-title">
+              <div className="max-w-xl">
+                <h2 id="impact-cta-title" className="font-display text-xl font-bold text-slate-950 dark:text-white">Help the next report reach the right person</h2>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">Add an accurate report or check the live community board for a possible match.</p>
+              </div>
+              <div className="flex flex-col gap-2 sm:shrink-0 sm:flex-row">
+                <Link href="/items/new" className="btn-primary inline-flex items-center justify-center gap-2">Post a report <ArrowRight size={16} aria-hidden="true" /></Link>
+                <Link href="/items" className="btn-outline inline-flex items-center justify-center">Browse reports</Link>
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </PublicLayout>
   );

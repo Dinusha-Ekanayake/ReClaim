@@ -1,3 +1,8 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+
 const NODES = [
   ['8%', '18%', '0s'],
   ['21%', '72%', '1.8s'],
@@ -8,8 +13,32 @@ const NODES = [
 ] as const;
 
 export default function CommunityBackdrop() {
+  const pathname = usePathname();
+  const [online, setOnline] = useState(true);
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
+
+  const section = pathname.startsWith('/chat')
+    ? 'chat'
+    : pathname.startsWith('/items') || pathname.startsWith('/search')
+      ? 'items'
+      : pathname.startsWith('/dashboard') || pathname.startsWith('/admin')
+        ? 'workspace'
+        : pathname.startsWith('/auth')
+          ? 'auth'
+          : 'community';
+
   return (
-    <div className="community-backdrop" aria-hidden="true">
+    <div className="community-backdrop" data-online={String(online)} data-section={section} aria-hidden="true">
       <div className="community-backdrop__mesh" />
       <div className="community-backdrop__glow community-backdrop__glow--blue" />
       <div className="community-backdrop__glow community-backdrop__glow--green" />

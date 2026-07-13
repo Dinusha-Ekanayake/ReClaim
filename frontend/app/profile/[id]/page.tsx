@@ -1,33 +1,49 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Image from 'next/image';
-import { motion } from 'framer-motion';
-import { MapPin, Calendar, Package, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import { MapPin, Calendar, Package, ArrowLeft, RefreshCw, PackageOpen } from 'lucide-react';
 import PublicLayout from '@/components/layout/PublicLayout';
 import ItemCard from '@/components/items/ItemCard';
 import { EmptyState } from '@/components/shared/EmptyState';
-import api from '@/lib/api';
-import { IMAGES } from '@/lib/images';
+import api, { ApiError } from '@/lib/api';
 import { formatDate, getAvatarFallback } from '@/lib/utils';
+import type { Item, User } from '@/types';
 
 export default function ProfilePage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+  const [profile, setProfile] = useState<User | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    setProfile(null);
+    setItems([]);
+
     Promise.all([
-      api.get(`/users/${id}`),
-      api.get(`/users/${id}/items`, { limit: 8, status: 'ACTIVE' }),
+      api.get(`/users/${id}`, undefined, { signal: controller.signal }),
+      api.get(`/users/${id}/items`, { limit: 8, status: 'ACTIVE' }, { signal: controller.signal }),
     ]).then(([user, itemsData]) => {
+      if (controller.signal.aborted) return;
       setProfile(user);
-      setItems(itemsData.items);
-    }).catch(() => router.push('/'))
-      .finally(() => setLoading(false));
-  }, [id]);
+      setItems(itemsData.items ?? []);
+    }).catch((requestError) => {
+      if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+      setProfile(null);
+      setItems([]);
+      setError(requestError instanceof ApiError ? requestError.message : 'Could not load this profile. Please try again.');
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
+
+    return () => controller.abort();
+  }, [id, retryKey]);
 
   if (loading) {
     return (
@@ -42,26 +58,40 @@ export default function ProfilePage() {
     );
   }
 
-  if (!profile) return null;
+  if (error || !profile) {
+    return (
+      <PublicLayout>
+        <div className="mx-auto max-w-xl px-4 py-20">
+          <div role="alert" className="card p-8 text-center">
+            <h1 className="text-xl font-display font-bold text-gray-900 dark:text-white">Profile unavailable</h1>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{error || 'This profile could not be found.'}</p>
+            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+              <button type="button" onClick={() => setRetryKey(key => key + 1)} className="btn-primary inline-flex items-center justify-center gap-2">
+                <RefreshCw size={15} aria-hidden="true" /> Try again
+              </button>
+              <Link href="/items" className="btn-secondary inline-flex items-center justify-center">Browse items</Link>
+            </div>
+          </div>
+        </div>
+      </PublicLayout>
+    );
+  }
 
   return (
     <PublicLayout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <button onClick={() => router.back()}
-          className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-6 transition-colors">
-          <ArrowLeft size={16} /> Back
-        </button>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        <Link href="/items" className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-xl pr-3 text-sm font-semibold text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
+          <ArrowLeft size={16} aria-hidden="true" /> Back to reports
+        </Link>
 
         {/* Profile card with cover banner */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="card mb-8 overflow-hidden">
+        <div className="card mb-8 overflow-hidden">
           {/* Cover */}
-          <div className="relative h-32 bg-gradient-to-br from-primary-500 to-blue-700">
-            <Image src={IMAGES.community} alt="" fill className="object-cover opacity-30 mix-blend-overlay" sizes="100vw" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+          <div className="relative h-28 overflow-hidden bg-gradient-to-br from-primary-700 via-primary-600 to-secondary-600 sm:h-32">
+            <div aria-hidden="true" className="absolute inset-0 opacity-[0.14]" style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/25 to-transparent" />
           </div>
-          <div className="px-8 pb-8">
+          <div className="px-5 pb-6 sm:px-8 sm:pb-8">
             <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6 -mt-12">
               {profile.avatarUrl ? (
                 <Image src={profile.avatarUrl} alt={profile.name} width={96} height={96}
@@ -88,14 +118,14 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* Items */}
         <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-5">Active Items</h2>
         {items.length === 0 ? (
-          <EmptyState icon="📭" title="No active items" description="This user has no active posts." />
+          <EmptyState icon={<PackageOpen size={23} />} title="No active items" description="This member has no active public reports." />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {items.map(item => <ItemCard key={item.id} item={item} />)}
           </div>
         )}

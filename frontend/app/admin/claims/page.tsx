@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ExternalLink, CheckCircle, XCircle, MessageSquare } from 'lucide-react';
-import api from '@/lib/api';
+import { ExternalLink, CheckCircle, XCircle, MessageSquare, RefreshCw } from 'lucide-react';
+import api, { ApiError } from '@/lib/api';
+import { Pagination } from '@/components/shared/Pagination';
 import { cn, timeAgo, getAvatarFallback } from '@/lib/utils';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -12,6 +13,10 @@ const STATUS_STYLES: Record<string, string> = {
   REJECTED: 'bg-red-500/10  text-red-400',
 };
 
+function questionLabel(key: string, index: number) {
+  return /^q\d+$/i.test(key) ? `Question ${index + 1}` : key;
+}
+
 export default function AdminClaimsPage() {
   const [claims, setClaims]   = useState<any[]>([]);
   const [total, setTotal]     = useState(0);
@@ -19,28 +24,49 @@ export default function AdminClaimsPage() {
   const [status, setStatus]   = useState('PENDING');
   const [page, setPage]       = useState(1);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
 
-  const fetchClaims = async () => {
-    setLoading(true);
+  const fetchClaims = useCallback(async (signal?: AbortSignal, showLoading = true) => {
+    if (showLoading) setLoading(true);
+    setError('');
     try {
       const data = await api.get('/admin/claims', {
         page, limit: 20,
         ...(status && { status }),
-      });
-      setClaims(data.claims);
-      setTotal(data.total);
+      }, { signal });
+      if (signal?.aborted) return false;
+      setClaims(data.claims ?? []);
+      const nextTotal = data.total ?? 0;
+      setTotal(nextTotal);
+      const availablePages = Math.max(Math.ceil(nextTotal / 20), 1);
+      if (page > availablePages) setPage(availablePages);
+      return true;
+    } catch (requestError) {
+      if (requestError instanceof DOMException && requestError.name === 'AbortError') return false;
+      setClaims([]);
+      setTotal(0);
+      setError(requestError instanceof ApiError ? requestError.message : 'Could not load claims.');
+      return false;
     } finally {
-      setLoading(false);
+      if (!signal?.aborted && showLoading) setLoading(false);
     }
-  };
+  }, [page, status]);
 
-  useEffect(() => { fetchClaims(); }, [status, page]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchClaims(controller.signal);
+    return () => controller.abort();
+  }, [fetchClaims, retryKey]);
 
   const handleReview = async (claimId: string, newStatus: 'APPROVED' | 'REJECTED') => {
     setProcessing(claimId);
+    setError('');
     try {
-      const updated = await api.patch(`/admin/claims/${claimId}`, { status: newStatus });
-      setClaims(prev => prev.map(c => c.id === claimId ? { ...c, status: updated.status } : c));
+      await api.patch(`/admin/claims/${claimId}`, { status: newStatus });
+      await fetchClaims(undefined, false);
+    } catch (requestError) {
+      setError(requestError instanceof ApiError ? requestError.message : 'Could not update this claim.');
     } finally {
       setProcessing(null);
     }
@@ -61,7 +87,7 @@ export default function AdminClaimsPage() {
           { label: 'Rejected', value: 'REJECTED' },
           { label: 'All', value: '' },
         ].map(s => (
-          <button key={s.value} onClick={() => { setStatus(s.value); setPage(1); }}
+          <button key={s.value} type="button" aria-pressed={status === s.value} onClick={() => { setStatus(s.value); setPage(1); }}
             className={cn('px-4 py-2 rounded-xl text-sm font-medium transition-all',
               status === s.value
                 ? 'bg-primary-600 text-white'
@@ -76,6 +102,15 @@ export default function AdminClaimsPage() {
           [...Array(5)].map((_, i) => (
             <div key={i} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 h-28 skeleton" />
           ))
+        ) : error ? (
+          <div role="alert" className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-center">
+            <p className="font-semibold text-red-300">Claims are unavailable</p>
+            <p className="mt-1 text-sm text-gray-400">{error}</p>
+            <button type="button" onClick={() => setRetryKey(key => key + 1)}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100">
+              <RefreshCw size={14} aria-hidden="true" /> Try again
+            </button>
+          </div>
         ) : claims.length === 0 ? (
           <div className="text-center py-16 text-gray-500">
             <MessageSquare size={40} className="mx-auto mb-3 text-gray-700" />
@@ -141,9 +176,14 @@ export default function AdminClaimsPage() {
                 {claim.verificationAnswers && Object.keys(claim.verificationAnswers).length > 0 && (
                   <div className="mt-3 p-3 bg-gray-800 rounded-xl">
                     <p className="text-xs font-semibold text-gray-400 mb-1.5">Verification answers:</p>
-                    {Object.entries(claim.verificationAnswers as Record<string, string>).map(([key, answer], i) => (
-                      <p key={key} className="text-xs text-gray-300">Q{i + 1}: {answer}</p>
-                    ))}
+                    <div className="space-y-2">
+                      {Object.entries(claim.verificationAnswers as Record<string, string>).map(([key, answer], i) => (
+                        <div key={key} className="rounded-lg bg-gray-900/70 px-3 py-2">
+                          <p className="text-xs font-medium text-gray-400">{questionLabel(key, i)}</p>
+                          <p className="mt-0.5 text-sm text-gray-200">{answer}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -153,13 +193,13 @@ export default function AdminClaimsPage() {
                 <div className="flex flex-col gap-2 flex-shrink-0">
                   <button
                     onClick={() => handleReview(claim.id, 'APPROVED')}
-                    disabled={processing === claim.id}
+                    disabled={processing !== null}
                     className="flex items-center gap-1.5 px-3 py-2 bg-green-600/20 text-green-400 rounded-xl text-xs font-semibold hover:bg-green-600/30 transition-colors disabled:opacity-50">
                     <CheckCircle size={13} /> Approve
                   </button>
                   <button
                     onClick={() => handleReview(claim.id, 'REJECTED')}
-                    disabled={processing === claim.id}
+                    disabled={processing !== null}
                     className="flex items-center gap-1.5 px-3 py-2 bg-red-600/20 text-red-400 rounded-xl text-xs font-semibold hover:bg-red-600/30 transition-colors disabled:opacity-50">
                     <XCircle size={13} /> Reject
                   </button>
@@ -171,21 +211,7 @@ export default function AdminClaimsPage() {
       </div>
 
       {/* Pagination */}
-      {total > 20 && (
-        <div className="flex justify-center gap-2 mt-6">
-          <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-            className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-700 transition-colors">
-            Previous
-          </button>
-          <span className="px-4 py-2 text-sm text-gray-400">
-            Page {page} of {Math.ceil(total / 20)}
-          </span>
-          <button disabled={page >= Math.ceil(total / 20)} onClick={() => setPage(p => p + 1)}
-            className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-700 transition-colors">
-            Next
-          </button>
-        </div>
-      )}
+      {!error && <Pagination page={page} pages={Math.ceil(total / 20)} onPageChange={setPage} className="mt-6" />}
     </div>
   );
 }

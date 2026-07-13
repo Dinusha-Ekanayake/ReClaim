@@ -1,27 +1,25 @@
 'use client';
 import Link from 'next/link';
-import Image from 'next/image';
 import { BarChart3, Mail, Heart, MessageCircle } from 'lucide-react';
 import { useLanguage } from '@/components/providers/LanguageProvider';
+import Logo from '@/components/shared/Logo';
 
 export default function Footer() {
   const { t } = useLanguage();
   return (
     <footer className="bg-gray-950 text-gray-400 mt-auto">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="md:col-span-1">
-            <Link href="/" aria-label="ReClaim home" className="mb-4 inline-flex overflow-hidden rounded-2xl bg-white p-1 shadow-lg shadow-black/20">
-              <Image src="/logo.png" alt="ReClaim" width={150} height={150} className="h-16 w-36 object-contain" />
-            </Link>
+            <div className="mb-4 inline-flex overflow-hidden rounded-2xl bg-white p-1 shadow-lg shadow-black/20"><Logo href="/" size="md" /></div>
             <p className="text-sm leading-relaxed mb-4">
               {t('footer.tagline')} {t('hero.sub')}
             </p>
             <div className="flex items-center gap-3">
-              <Link href="/impact" aria-label="Community impact" className="p-2 hover:text-white transition-colors"><BarChart3 size={18} /></Link>
-              <Link href="/contact" aria-label="Contact ReClaim" className="p-2 hover:text-white transition-colors"><MessageCircle size={18} /></Link>
-              <a href="mailto:hello@reclaim.app" aria-label="Email ReClaim" className="p-2 hover:text-white transition-colors"><Mail size={18} /></a>
+              <Link href="/impact" aria-label="Community impact" className="flex size-11 items-center justify-center rounded-xl hover:bg-white/10 hover:text-white transition-colors"><BarChart3 size={18} /></Link>
+              <Link href="/contact" aria-label="Contact ReClaim" className="flex size-11 items-center justify-center rounded-xl hover:bg-white/10 hover:text-white transition-colors"><MessageCircle size={18} /></Link>
+              <Link href="/contact" aria-label="Send a message to ReClaim" className="flex size-11 items-center justify-center rounded-xl hover:bg-white/10 hover:text-white transition-colors"><Mail size={18} /></Link>
             </div>
           </div>
 
@@ -79,7 +77,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="mt-9 pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs">
             © {new Date().getFullYear()} ReClaim. All rights reserved.
           </p>

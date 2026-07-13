@@ -1,10 +1,12 @@
 'use client';
+
+import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { Inbox } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface EmptyStateProps {
-  icon?: string;
+  icon?: ReactNode;
   title: string;
   description?: string;
   actionLabel?: string;
@@ -14,41 +16,23 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({
-  icon = '📭',
+  icon,
   title,
   description,
   actionLabel,
   actionHref,
   onAction,
   className,
-}: EmptyStateProps) {
+}: Readonly<EmptyStateProps>) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-      className={cn('flex flex-col items-center justify-center text-center py-16 px-6', className)}
-    >
-      <motion.div
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 12 }}
-        className="text-5xl mb-4 select-none"
-      >
-        {icon}
-      </motion.div>
+    <div className={cn('flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white/65 px-6 py-10 text-center dark:border-slate-700 dark:bg-slate-900/65', className)}>
+      <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500" aria-hidden="true">
+        {icon ?? <Inbox size={23} />}
+      </div>
       <h3 className="text-lg font-display font-semibold text-gray-900 dark:text-white mb-2">{title}</h3>
       {description && <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-sm">{description}</p>}
-      {actionLabel && actionHref && (
-        <Link href={actionHref} className="btn-primary">
-          {actionLabel}
-        </Link>
-      )}
-      {actionLabel && onAction && (
-        <button onClick={onAction} className="btn-primary">
-          {actionLabel}
-        </button>
-      )}
-    </motion.div>
+      {actionLabel && actionHref && <Link href={actionHref} className="btn-primary">{actionLabel}</Link>}
+      {actionLabel && onAction && <button type="button" onClick={onAction} className="btn-primary">{actionLabel}</button>}
+    </div>
   );
 }

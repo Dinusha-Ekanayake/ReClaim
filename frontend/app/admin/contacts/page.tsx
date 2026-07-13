@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Clock3, Inbox, Mail, Search, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, Clock3, Inbox, Mail, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import api, { ApiError } from '@/lib/api';
+import { Pagination } from '@/components/shared/Pagination';
 import { timeAgo } from '@/lib/utils';
 
 type ContactStatus = 'NEW' | 'IN_PROGRESS' | 'RESOLVED' | 'SPAM';
@@ -32,24 +33,48 @@ export default function AdminContactsPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+  const [retryKey, setRetryKey] = useState(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (signal?: AbortSignal, showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError('');
     try {
-      const data = await api.get('/admin/contacts', { status: status || undefined, search: search.trim() || undefined, limit: 50 });
+      const data = await api.get('/admin/contacts', {
+        status: status || undefined,
+        search: search.trim() || undefined,
+        page,
+        limit: 20,
+      }, { signal });
+      if (signal?.aborted) return false;
       setContacts(data.contacts ?? []);
+      setTotal(data.total ?? 0);
+      const availablePages = Math.max(data.pages ?? 1, 1);
+      setPages(availablePages);
+      if (page > availablePages) setPage(availablePages);
+      return true;
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return false;
+      setContacts([]);
+      setTotal(0);
+      setPages(1);
       setError(err instanceof ApiError ? err.message : 'Could not load the support inbox.');
+      return false;
     } finally {
-      setLoading(false);
+      if (!signal?.aborted && showLoading) setLoading(false);
     }
-  }, [search, status]);
+  }, [page, search, status]);
 
   useEffect(() => {
-    const timer = setTimeout(load, 250);
-    return () => clearTimeout(timer);
-  }, [load]);
+    const controller = new AbortController();
+    const timer = setTimeout(() => { void load(controller.signal); }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [load, retryKey]);
 
   const updateStatus = async (contact: ContactMessage, nextStatus: ContactStatus) => {
     setUpdating(contact.id);
@@ -60,6 +85,7 @@ export default function AdminContactsPage() {
         adminNote: contact.adminNote || null,
       });
       setContacts(current => current.map(entry => entry.id === updated.id ? updated : entry));
+      await load(undefined, false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not update the message.');
     } finally {
@@ -73,16 +99,16 @@ export default function AdminContactsPage() {
         <div>
           <p className="mb-1 text-xs font-bold uppercase tracking-[0.18em] text-primary-400">Support</p>
           <h1 className="text-2xl font-display font-bold text-white">Contact inbox</h1>
-          <p className="mt-1 text-sm text-gray-500">Real messages submitted from the public contact form.</p>
+          <p className="mt-1 text-sm text-gray-500">{total} real message{total === 1 ? '' : 's'} submitted from the public contact form.</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <label className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" aria-hidden="true" />
-            <input value={search} onChange={event => setSearch(event.target.value)} maxLength={120}
+            <input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} maxLength={120}
               aria-label="Search contact messages" placeholder="Search inbox"
               className="h-10 rounded-xl border border-gray-800 bg-gray-900 pl-9 pr-3 text-sm text-white placeholder:text-gray-600" />
           </label>
-          <select value={status} onChange={event => setStatus(event.target.value as ContactStatus | '')}
+          <select value={status} onChange={event => { setStatus(event.target.value as ContactStatus | ''); setPage(1); }}
             aria-label="Filter contact status" className="h-10 rounded-xl border border-gray-800 bg-gray-900 px-3 text-sm text-white">
             <option value="">All statuses</option>
             <option value="NEW">New</option>
@@ -93,10 +119,17 @@ export default function AdminContactsPage() {
         </div>
       </div>
 
-      {error && <div role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
-
       {loading ? (
         <div className="grid gap-3">{[...Array(4)].map((_, index) => <div key={index} className="h-36 animate-pulse rounded-2xl bg-gray-900" />)}</div>
+      ) : error ? (
+        <div role="alert" className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-center">
+          <p className="font-semibold text-red-300">The support inbox is unavailable</p>
+          <p className="mt-1 text-sm text-gray-400">{error}</p>
+          <button type="button" onClick={() => setRetryKey(key => key + 1)}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100">
+            <RefreshCw size={14} aria-hidden="true" /> Try again
+          </button>
+        </div>
       ) : contacts.length === 0 ? (
         <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-gray-800 bg-gray-900/50 text-center">
           <Inbox size={30} className="mb-3 text-gray-700" />
@@ -142,6 +175,8 @@ export default function AdminContactsPage() {
           ))}
         </div>
       )}
+
+      {!loading && !error && <Pagination page={page} pages={pages} onPageChange={setPage} />}
     </div>
   );
 }

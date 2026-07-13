@@ -39,7 +39,8 @@ const ToastClose = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Close
     ref={ref}
-    className={cn('absolute right-2 top-2 rounded-md p-1 opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100', className)}
+    aria-label="Dismiss notification"
+    className={cn('absolute right-2 top-2 rounded-md p-1 opacity-0 transition-opacity hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100', className)}
     toast-close=""
     {...props}
   >
@@ -69,14 +70,17 @@ let toastFn: ((opts: { title: string; description?: string; variant?: 'default' 
 
 export function Toaster() {
   const [toasts, setToasts] = React.useState<Array<{
-    id: string; title: string; description?: string; variant?: 'default' | 'destructive'; open: boolean;
+    id: string; title: string; description?: string; variant?: 'default' | 'destructive';
   }>>([]);
+
+  const dismissToast = React.useCallback((id: string) => {
+    setToasts(prev => prev.filter(item => item.id !== id));
+  }, []);
 
   React.useEffect(() => {
     toastFn = ({ title, description, variant = 'default' }) => {
       const id = crypto.randomUUID();
-      setToasts(prev => [...prev, { id, title, description, variant, open: true }]);
-      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+      setToasts(prev => [...prev.slice(-4), { id, title, description, variant }]);
     };
     return () => { toastFn = null; };
   }, []);
@@ -84,7 +88,13 @@ export function Toaster() {
   return (
     <ToastProvider>
       {toasts.map(toast => (
-        <Toast key={toast.id} open={toast.open} variant={toast.variant}>
+        <Toast
+          key={toast.id}
+          open
+          duration={4000}
+          variant={toast.variant}
+          onOpenChange={open => { if (!open) dismissToast(toast.id); }}
+        >
           <div>
             <ToastTitle>{toast.title}</ToastTitle>
             {toast.description && <ToastDescription>{toast.description}</ToastDescription>}

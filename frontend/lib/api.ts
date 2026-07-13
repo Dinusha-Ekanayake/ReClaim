@@ -1,5 +1,11 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+// Browser requests stay on the frontend origin and are proxied by Next.js.
+// This keeps HttpOnly refresh cookies first-party across browsers while the
+// backend URL remains a server-side rewrite target.
+import { hasLocalStorageAccess, readLocalStorage, removeLocalStorage, writeLocalStorage } from '@/lib/browserStorage';
+
+const API_URL = '/api';
 let accessToken: string | null = null;
+const REFRESH_LOCK_KEY = 'reclaim_refresh_lock';
 
 class ApiError extends Error {
   status: number;
@@ -11,7 +17,7 @@ class ApiError extends Error {
   }
 }
 
-async function getAccessToken(): Promise<string | null> {
+export function getSessionAccessToken(): string | null {
   return accessToken;
 }
 
@@ -19,24 +25,78 @@ export function setAccessToken(token: string | null) {
   accessToken = token;
 }
 
+const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+async function acquireRefreshLock(): Promise<() => void> {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const deadline = Date.now() + 12_000;
+
+  while (Date.now() < deadline) {
+    let current: { id?: string; expiresAt?: number } | null = null;
+    try {
+      current = JSON.parse(readLocalStorage(REFRESH_LOCK_KEY) || 'null');
+    } catch {
+      removeLocalStorage(REFRESH_LOCK_KEY);
+    }
+
+    if (!current?.id || !current.expiresAt || current.expiresAt <= Date.now()) {
+      if (!writeLocalStorage(REFRESH_LOCK_KEY, JSON.stringify({ id, expiresAt: Date.now() + 10_000 }))) {
+        // In restricted browser contexts, the in-module refresh promise still
+        // coalesces requests in this tab even though cross-tab locking is unavailable.
+        return () => undefined;
+      }
+      // A short settle makes localStorage's read/write sequence act as a
+      // cross-tab election: if two tabs raced, only the last writer proceeds.
+      await wait(40 + Math.floor(Math.random() * 40));
+      try {
+        const elected = JSON.parse(readLocalStorage(REFRESH_LOCK_KEY) || 'null');
+        if (elected?.id === id) {
+          return () => {
+            try {
+              const held = JSON.parse(readLocalStorage(REFRESH_LOCK_KEY) || 'null');
+              if (held?.id === id) removeLocalStorage(REFRESH_LOCK_KEY);
+            } catch {
+              removeLocalStorage(REFRESH_LOCK_KEY);
+            }
+          };
+        }
+      } catch {
+        removeLocalStorage(REFRESH_LOCK_KEY);
+      }
+    }
+    await wait(100);
+  }
+
+  throw new ApiError('Session refresh is busy. Please try again.', 503);
+}
+
 async function refreshAccessToken(): Promise<string | null> {
+  const release = await acquireRefreshLock();
   try {
     const res = await fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
+      signal: AbortSignal.timeout(8_000),
     });
-    if (!res.ok) {
-      localStorage.removeItem('hasSession');
+    if (res.status === 401 || res.status === 403) {
+      removeLocalStorage('hasSession');
       setAccessToken(null);
       return null;
     }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new ApiError(data.error || 'Session refresh is temporarily unavailable.', res.status, data);
+    }
     const data = await res.json();
     setAccessToken(data.accessToken);
-    localStorage.setItem('hasSession', 'true');
+    writeLocalStorage('hasSession', 'true');
     return data.accessToken;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError('Could not reach the session service. Please try again.', 0);
+  } finally {
+    release();
   }
 }
 
@@ -49,19 +109,35 @@ function refreshOnce() {
   return refreshPromise;
 }
 
+/**
+ * Force a session refresh while coalescing concurrent HTTP and Socket.IO
+ * recovery attempts into one request.
+ */
+export function refreshSession(): Promise<string | null> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  return refreshOnce();
+}
+
 export async function restoreAccessToken(): Promise<boolean> {
-  if (typeof window === 'undefined' || localStorage.getItem('hasSession') !== 'true') return false;
+  if (typeof window === 'undefined') return false;
+  const sessionMarker = readLocalStorage('hasSession');
+  if (sessionMarker !== 'true' && hasLocalStorageAccess()) return false;
   if (accessToken) return true;
-  return !!(await refreshOnce());
+  return !!(await refreshSession());
+}
+
+function hasEstablishedBrowserSession() {
+  return accessToken !== null || readLocalStorage('hasSession') === 'true' || !hasLocalStorageAccess();
 }
 
 interface RequestOptions extends RequestInit {
   skipAuth?: boolean;
   params?: Record<string, string | number | boolean | undefined>;
+  timeoutMs?: number;
 }
 
 async function request<T = any>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-  const { skipAuth = false, params, ...fetchOptions } = options;
+  const { skipAuth = false, params, timeoutMs = 30_000, ...fetchOptions } = options;
 
   // Build URL with params
   let url = `${API_URL}${endpoint}`;
@@ -83,30 +159,49 @@ async function request<T = any>(endpoint: string, options: RequestOptions = {}):
   };
 
   if (!skipAuth) {
-    const token = await getAccessToken();
+    const token = getSessionAccessToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, { ...fetchOptions, headers, credentials: 'include' });
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const signal = fetchOptions.signal
+    ? AbortSignal.any([fetchOptions.signal, timeoutSignal])
+    : timeoutSignal;
+  const response = await fetch(url, { ...fetchOptions, headers, credentials: 'include', signal });
 
   // Token expired — refresh only an established session. A 401 from login or
   // another public auth endpoint must preserve its real server error.
   if (response.status === 401 && !skipAuth) {
     const data = await response.json().catch(() => ({}));
-    if (data.code === 'TOKEN_EXPIRED' && typeof window !== 'undefined' && localStorage.getItem('hasSession') === 'true') {
-      const newToken = await refreshOnce();
+    if (data.code === 'TOKEN_EXPIRED' && typeof window !== 'undefined' && hasEstablishedBrowserSession()) {
+      const newToken = await refreshSession();
       if (newToken) {
         headers['Authorization'] = `Bearer ${newToken}`;
-        const retryResponse = await fetch(url, { ...fetchOptions, headers, credentials: 'include' });
+        const retryTimeoutSignal = AbortSignal.timeout(timeoutMs);
+        const retrySignal = fetchOptions.signal
+          ? AbortSignal.any([fetchOptions.signal, retryTimeoutSignal])
+          : retryTimeoutSignal;
+        const retryResponse = await fetch(url, {
+          ...fetchOptions,
+          headers,
+          credentials: 'include',
+          signal: retrySignal,
+        });
         if (!retryResponse.ok) {
           const errData = await retryResponse.json().catch(() => ({}));
           throw new ApiError(errData.error || 'Request failed', retryResponse.status, errData);
         }
+        if (retryResponse.status === 204) return undefined as T;
         return retryResponse.json();
       }
     }
-    if (typeof window !== 'undefined' && localStorage.getItem('hasSession') === 'true') {
-      localStorage.removeItem('hasSession');
+    const invalidSessionCodes = new Set(['TOKEN_EXPIRED', 'AUTH_REQUIRED', 'INVALID_TOKEN', 'USER_NOT_FOUND']);
+    if (
+      invalidSessionCodes.has(data.code)
+      && typeof window !== 'undefined'
+      && hasEstablishedBrowserSession()
+    ) {
+      removeLocalStorage('hasSession');
       setAccessToken(null);
       if (!window.location.pathname.startsWith('/auth/')) {
         window.location.assign('/auth/login?expired=true');
@@ -144,7 +239,7 @@ export const api = {
     request<T>(endpoint, { method: 'DELETE', ...(body !== undefined && { body: JSON.stringify(body) }) }),
 
   upload: <T = any>(endpoint: string, formData: FormData) =>
-    request<T>(endpoint, { method: 'POST', body: formData }),
+    request<T>(endpoint, { method: 'POST', body: formData, timeoutMs: 60_000 }),
 };
 
 export { ApiError };

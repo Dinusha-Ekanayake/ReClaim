@@ -6,7 +6,7 @@ const LeafletMap = dynamic(() => import('./LeafletMap'), { ssr: false, loading: 
   <div className="h-48 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 text-sm">Loading map…</div>
 ) });
 
-interface MapViewProps { lat: number; lng: number; label: string; }
-export default function MapView({ lat, lng, label }: MapViewProps) {
-  return <LeafletMap lat={lat} lng={lng} label={label} />;
+interface MapViewProps { lat: number; lng: number; label: string; precise?: boolean; }
+export default function MapView({ lat, lng, label, precise = false }: MapViewProps) {
+  return <LeafletMap lat={lat} lng={lng} label={label} precise={precise} />;
 }

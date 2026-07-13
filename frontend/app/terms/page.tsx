@@ -7,11 +7,11 @@ export const metadata: Metadata = { title: 'Terms of Service' };
 export default function TermsPage() {
   return (
     <PublicLayout>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16">
         <div className="mb-10">
           <p className="text-sm text-gray-400 dark:text-gray-500 font-medium mb-2">Legal</p>
           <h1 className="text-4xl font-display font-extrabold text-gray-900 dark:text-white mb-3">Terms of Service</h1>
-          <p className="text-gray-500 dark:text-gray-400">Last updated: May 13, 2026</p>
+          <p className="text-gray-500 dark:text-gray-400">Last updated: July 13, 2026</p>
         </div>
 
         <div className="prose prose-gray dark:prose-invert max-w-none space-y-8 text-gray-700 dark:text-gray-300 leading-relaxed">
@@ -73,7 +73,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-3">10. Contact</h2>
-            <p>For questions, contact us at <a href="mailto:legal@reclaim.app" className="text-primary-600 hover:underline">legal@reclaim.app</a>.</p>
+            <p>For questions about these terms, use the <Link href="/contact" className="text-primary-600 hover:underline">ReClaim contact form</Link>.</p>
           </section>
         </div>
       </div>

@@ -3,18 +3,32 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Users, Package, Flag, CheckCircle, TrendingUp,
-  AlertTriangle, ArrowRight, Clock, BarChart2
+  AlertTriangle, ArrowRight, Clock, BarChart2, RefreshCw
 } from 'lucide-react';
-import api from '@/lib/api';
+import api, { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    api.get('/admin/stats').then(setStats).finally(() => setLoading(false));
-  }, []);
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    api.get('/admin/stats', undefined, { signal: controller.signal }).then(data => {
+      if (!controller.signal.aborted) setStats(data);
+    }).catch((requestError) => {
+      if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+      setStats(null);
+      setError(requestError instanceof ApiError ? requestError.message : 'Could not load platform statistics.');
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
+    return () => controller.abort();
+  }, [retryKey]);
 
   if (loading) {
     return (
@@ -23,6 +37,25 @@ export default function AdminDashboardPage() {
           {[...Array(4)].map((_, i) => (
             <div key={i} className="bg-gray-900 rounded-2xl p-5 h-32 skeleton" />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-display font-bold text-white mb-1">Admin Dashboard</h1>
+          <p className="text-gray-400 text-sm">Monitor and manage the ReClaim platform</p>
+        </div>
+        <div role="alert" className="max-w-2xl rounded-2xl border border-red-500/20 bg-red-500/10 p-6">
+          <h2 className="font-semibold text-red-300">Dashboard metrics are unavailable</h2>
+          <p className="mt-1 text-sm text-gray-400">{error || 'The statistics response was empty.'}</p>
+          <button type="button" onClick={() => setRetryKey(key => key + 1)}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-gray-900 transition hover:bg-gray-100">
+            <RefreshCw size={14} aria-hidden="true" /> Try again
+          </button>
         </div>
       </div>
     );

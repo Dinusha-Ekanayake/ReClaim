@@ -3,12 +3,26 @@
 import { Suspense, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { Upload, X, Plus, Minus, AlertCircle, CheckCircle } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle,
+  LocateFixed,
+  LockKeyhole,
+  MapPin,
+  Minus,
+  PackageCheck,
+  Plus,
+  Search,
+  ShieldQuestion,
+  Upload,
+  X,
+} from 'lucide-react';
 import PublicLayout from '@/components/layout/PublicLayout';
 import { useAuthStore, useIsLoggedIn } from '@/lib/store/authStore';
 import api, { ApiError } from '@/lib/api';
-import { CATEGORIES, COLORS, cn } from '@/lib/utils';
+import { CATEGORIES, COLORS, cn, toLocalDateInputValue } from '@/lib/utils';
 import Link from 'next/link';
+import LocationPicker from '@/components/items/LocationPicker';
 
 function NewItemPageContent() {
   const router = useRouter();
@@ -20,12 +34,14 @@ function NewItemPageContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState('');
   const [images, setImages] = useState<{ file: File; preview: string }[]>([]);
   const [hints, setHints] = useState<string[]>(['']);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
-    type: (searchParams.get('type') as 'LOST' | 'FOUND') || 'LOST',
+    type: searchParams.get('type') === 'FOUND' ? 'FOUND' as const : 'LOST' as const,
     title: '',
     description: '',
     category: '',
@@ -35,7 +51,9 @@ function NewItemPageContent() {
     size: '',
     locationLabel: '',
     locationArea: '',
-    dateLostFound: new Date().toISOString().split('T')[0],
+    locationLat: null as number | null,
+    locationLng: null as number | null,
+    dateLostFound: toLocalDateInputValue(),
     showContactInfo: false,
   });
 
@@ -48,14 +66,17 @@ function NewItemPageContent() {
       <PublicLayout>
         <div className="min-h-[60vh] flex items-center justify-center">
           <div className="text-center">
-            <div className="text-5xl mb-4">🔐</div>
+            <LockKeyhole size={48} className="mx-auto mb-4 text-primary-600" aria-hidden="true" />
             <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-white mb-2">
               Sign in required
             </h2>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
               Please sign in to post a lost or found item.
             </p>
-            <Link href="/auth/login" className="btn-primary">
+            <Link
+              href={`/auth/login?next=${encodeURIComponent(`/items/new?${searchParams.toString()}`)}`}
+              className="btn-primary inline-flex items-center justify-center"
+            >
               Sign In
             </Link>
           </div>
@@ -66,6 +87,31 @@ function NewItemPageContent() {
 
   const update = (field: string, value: unknown) =>
     setForm((f) => ({ ...f, [field]: value }));
+
+  const handleUseCurrentLocation = () => {
+    setLocationError('');
+    if (!navigator.geolocation) {
+      setLocationError('Location access is not available in this browser. You can still enter the area manually.');
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setForm((current) => ({
+          ...current,
+          locationLat: Number(coords.latitude.toFixed(6)),
+          locationLng: Number(coords.longitude.toFixed(6)),
+        }));
+        setLocating(false);
+      },
+      () => {
+        setLocationError('We could not access your location. Choose a point on the map or enter the area manually.');
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+    );
+  };
 
   const handleImages = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError('');
@@ -112,7 +158,8 @@ function NewItemPageContent() {
       !cleanedTitle ||
       !cleanedDescription ||
       !form.category ||
-      !form.locationLabel.trim()
+      !form.locationLabel.trim() ||
+      !form.locationArea.trim()
     ) {
       setError('Please fill in all required fields.');
       return;
@@ -125,6 +172,13 @@ function NewItemPageContent() {
 
     if (cleanedDescription.length < 20) {
       setError('Description must be at least 20 characters.');
+      return;
+    }
+
+    const questions = hints.map((hint) => hint.trim()).filter(Boolean);
+    if (form.type === 'FOUND' && questions.length === 0) {
+      setError('Add at least one ownership question for people claiming this found item.');
+      setStep(4);
       return;
     }
 
@@ -147,7 +201,7 @@ function NewItemPageContent() {
         imageUrls: uploaded.map((u) => u.url),
         imagePublicIds: uploaded.map((u) => u.publicId),
         imageUploadTokens: uploaded.map((u) => u.uploadToken),
-        verificationHints: hints.map((h) => h.trim()).filter(Boolean),
+        verificationQuestions: questions,
       });
 
       setSuccess(true);
@@ -171,11 +225,11 @@ function NewItemPageContent() {
       <PublicLayout>
         <div className="min-h-[60vh] flex items-center justify-center">
           <div className="text-center animate-fade-in">
-            <CheckCircle size={64} className="text-secondary-500 dark:text-emerald-400 mx-auto mb-4 animate-bounce-in" />
+            <CheckCircle size={64} className="text-secondary-500 dark:text-emerald-400 mx-auto mb-4" />
             <h2 className="text-2xl font-display font-bold text-gray-900 dark:text-white mb-2">
-              Item Posted!
+              Report submitted
             </h2>
-            <p className="text-gray-500 dark:text-gray-400">Redirecting to your item…</p>
+            <p className="text-gray-500 dark:text-gray-400">It stays private until a moderator approves it. Opening your report…</p>
           </div>
         </div>
       </PublicLayout>
@@ -194,7 +248,10 @@ function NewItemPageContent() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
         <div className="mb-8">
           <h1 className="text-3xl font-display font-bold text-gray-900 dark:text-white mb-2">
-            {form.type === 'LOST' ? '🔍 Report Lost Item' : '📦 Post Found Item'}
+            <span className="inline-flex items-center gap-3">
+              {form.type === 'LOST' ? <Search className="text-red-500" aria-hidden="true" /> : <PackageCheck className="text-secondary-500" aria-hidden="true" />}
+              {form.type === 'LOST' ? 'Report Lost Item' : 'Post Found Item'}
+            </span>
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
             Fill in the details below to help others find and return your item.
@@ -262,17 +319,19 @@ function NewItemPageContent() {
                           : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                       )}
                     >
-                      {t === 'LOST' ? '🔍 I Lost Something' : '📦 I Found Something'}
+                      {t === 'LOST' ? <Search size={18} aria-hidden="true" /> : <PackageCheck size={18} aria-hidden="true" />}
+                      {t === 'LOST' ? 'I Lost Something' : 'I Found Something'}
                     </button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="item-title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   Item Title *
                 </label>
                 <input
+                  id="item-title"
                   type="text"
                   value={form.title}
                   onChange={(e) => update('title', e.target.value)}
@@ -309,19 +368,52 @@ function NewItemPageContent() {
                   ))}
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="item-subcategory" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Subcategory <span className="font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    id="item-subcategory"
+                    type="text"
+                    value={form.subcategory}
+                    onChange={(event) => update('subcategory', event.target.value)}
+                    maxLength={80}
+                    placeholder="e.g. Mobile phone, school bag"
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="item-size" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Size <span className="font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    id="item-size"
+                    type="text"
+                    value={form.size}
+                    onChange={(event) => update('size', event.target.value)}
+                    maxLength={40}
+                    placeholder="e.g. Small, 15 inch, size M"
+                    className="input-field"
+                  />
+                </div>
+              </div>
             </>
           )}
 
           {step === 2 && (
             <>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="item-description" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   Description *
                 </label>
                 <textarea
+                  id="item-description"
                   value={form.description}
                   onChange={(e) => update('description', e.target.value)}
                   rows={5}
+                  maxLength={2000}
                   placeholder="Describe the item in detail. Include any distinguishing features, what was inside, special marks, etc."
                   className="input-field resize-none"
                 />
@@ -358,36 +450,109 @@ function NewItemPageContent() {
                     value={form.brand}
                     onChange={(e) => update('brand', e.target.value)}
                     placeholder="e.g. Apple, Samsung, Nike"
+                    maxLength={80}
                     className="input-field"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="item-date" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     {form.type === 'LOST' ? 'Date Lost *' : 'Date Found *'}
                   </label>
                   <input
+                    id="item-date"
                     type="date"
                     value={form.dateLostFound}
                     onChange={(e) => update('dateLostFound', e.target.value)}
-                    max={new Date().toISOString().split('T')[0]}
+                    max={toLocalDateInputValue()}
                     className="input-field"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Location *
+                  <label htmlFor="item-area" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Public area *
                   </label>
                   <input
+                    id="item-area"
                     type="text"
-                    value={form.locationLabel}
-                    onChange={(e) => update('locationLabel', e.target.value)}
-                    placeholder="e.g. Near Colombo University, Galle Face"
+                    value={form.locationArea}
+                    onChange={(e) => update('locationArea', e.target.value)}
+                    maxLength={160}
+                    placeholder="e.g. Colombo 03, Galle Face area"
                     className="input-field"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="item-location" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Specific location *
+                </label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="relative flex-1">
+                    <MapPin size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+                    <input
+                      id="item-location"
+                      type="text"
+                      value={form.locationLabel}
+                      onChange={(event) => update('locationLabel', event.target.value)}
+                      maxLength={160}
+                      placeholder="e.g. Library entrance, Colombo University"
+                      className="input-field pl-10"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    disabled={locating}
+                    className="btn-outline inline-flex flex-shrink-0 items-center justify-center gap-2 px-4 disabled:opacity-60"
+                  >
+                    <LocateFixed size={17} aria-hidden="true" />
+                    {locating ? 'Locating…' : 'Use my location'}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                  Public visitors see only the approximate area. Exact coordinates help matching and should only be shared during verified coordination.
+                </p>
+                {locationError && <p role="alert" className="mt-2 text-sm text-amber-700 dark:text-amber-300">{locationError}</p>}
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-900">
+                <LocationPicker
+                  lat={form.locationLat}
+                  lng={form.locationLng}
+                  onChange={(lat, lng) => setForm((current) => ({ ...current, locationLat: lat, locationLng: lng }))}
+                />
+                <div className="grid grid-cols-1 gap-2 p-2 sm:grid-cols-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Latitude
+                    <input
+                      type="number"
+                      min={-90}
+                      max={90}
+                      step="any"
+                      value={form.locationLat ?? ''}
+                      onChange={(event) => update('locationLat', event.target.value === '' ? null : Number(event.target.value))}
+                      className="input-field mt-1 font-mono"
+                      placeholder="Tap the map"
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Longitude
+                    <input
+                      type="number"
+                      min={-180}
+                      max={180}
+                      step="any"
+                      value={form.locationLng ?? ''}
+                      onChange={(event) => update('locationLng', event.target.value === '' ? null : Number(event.target.value))}
+                      className="input-field mt-1 font-mono"
+                      placeholder="Tap the map"
+                    />
+                  </label>
                 </div>
               </div>
 
@@ -416,10 +581,11 @@ function NewItemPageContent() {
                   </span>
                 </label>
 
-                <div
+                <button
+                  type="button"
                   onClick={() => fileRef.current?.click()}
                   className={cn(
-                    'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
+                    'w-full border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
                     images.length > 0
                       ? 'border-primary-300 dark:border-primary-500/40 bg-blue-50 dark:bg-primary-500/10'
                       : 'border-gray-300 dark:border-gray-700 hover:border-primary-400 hover:bg-blue-50/30 dark:hover:bg-primary-500/5'
@@ -427,20 +593,21 @@ function NewItemPageContent() {
                 >
                   <Upload size={32} className="mx-auto text-gray-400 mb-3" />
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Click to upload images
+                    Choose photos
                   </p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                     JPG, PNG, WebP — Max 5MB each
                   </p>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleImages}
-                  />
-                </div>
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  multiple
+                  className="sr-only"
+                  aria-label="Upload up to five item photos"
+                  onChange={handleImages}
+                />
               </div>
 
               {images.length > 0 && (
@@ -460,9 +627,10 @@ function NewItemPageContent() {
                       <button
                         type="button"
                         onClick={() => removeImage(i)}
-                        className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label={`Remove photo ${i + 1}`}
+                        className="absolute right-1 top-1 flex size-8 items-center justify-center rounded-full bg-red-500 text-white opacity-100 shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                       >
-                        <X size={10} />
+                        <X size={14} />
                       </button>
                     </div>
                   ))}
@@ -471,6 +639,7 @@ function NewItemPageContent() {
                     <button
                       type="button"
                       onClick={() => fileRef.current?.click()}
+                      aria-label="Add another photo"
                       className="aspect-square rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center hover:border-primary-400 transition-colors"
                     >
                       <Plus size={24} className="text-gray-400" />
@@ -485,14 +654,15 @@ function NewItemPageContent() {
             <>
               {form.type === 'FOUND' && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Private Verification Checklist{' '}
+                  <label className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <ShieldQuestion size={17} className="text-primary-600" aria-hidden="true" />
+                    Ownership questions{' '}
                     <span className="text-gray-400 dark:text-gray-500 font-normal">
-                      (hidden from public)
+                      (shown only when someone claims)
                     </span>
                   </label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                    Record details only the real owner should know. These stay private and help you compare a claimant&apos;s answers.
+                    Ask something the real owner can answer without revealing the answer in the listing. You will review their response before approving a return.
                   </p>
 
                   <div className="space-y-2">
@@ -506,13 +676,16 @@ function NewItemPageContent() {
                             next[i] = e.target.value;
                             setHints(next);
                           }}
-                          placeholder={`Expected detail ${i + 1}`}
+                          placeholder={`Question ${i + 1}, e.g. What is engraved inside the bag?`}
+                          minLength={3}
+                          maxLength={200}
                           className="input-field flex-1 text-sm"
                         />
 
                         <button
                           type="button"
                           onClick={() => setHints((h) => h.filter((_, j) => j !== i))}
+                          aria-label={`Remove ownership question ${i + 1}`}
                           className="p-2.5 text-gray-400 hover:text-red-500 transition-colors"
                         >
                           <Minus size={16} />
@@ -526,7 +699,7 @@ function NewItemPageContent() {
                         onClick={() => setHints((h) => [...h, ''])}
                         className="flex items-center gap-2 text-sm text-primary-600 hover:underline"
                       >
-                        <Plus size={14} /> Add another hint
+                        <Plus size={14} /> Add another question
                       </button>
                     )}
                   </div>
@@ -546,7 +719,9 @@ function NewItemPageContent() {
                     ['Color', form.color || '—'],
                     ['Brand', form.brand || '—'],
                     ['Date', form.dateLostFound],
-                    ['Location', form.locationLabel],
+                    ['Public area', form.locationArea],
+                    ['Location detail', form.locationLabel],
+                    ['Map point', form.locationLat !== null && form.locationLng !== null ? 'Added' : 'Not added'],
                     ['Photos', `${images.length} image(s)`],
                   ].map(([k, v]) => (
                     <div key={k}>
@@ -586,8 +761,13 @@ function NewItemPageContent() {
                   return;
                 }
 
-                if (step === 2 && (!form.description.trim() || !form.locationLabel.trim() || !form.dateLostFound)) {
-                  setError('Please fill in description, location, and date.');
+                if (step === 2 && (!form.description.trim() || !form.locationLabel.trim() || !form.locationArea.trim() || !form.dateLostFound)) {
+                  setError('Please fill in description, public area, specific location, and date.');
+                  return;
+                }
+
+                if (step === 2 && ((form.locationLat === null) !== (form.locationLng === null))) {
+                  setError('Add both latitude and longitude, or leave both coordinates empty.');
                   return;
                 }
 

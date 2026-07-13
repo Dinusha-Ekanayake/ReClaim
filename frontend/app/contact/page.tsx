@@ -1,139 +1,218 @@
 'use client';
+
 import { useState } from 'react';
+import Link from 'next/link';
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  CircleHelp,
+  Inbox,
+  LoaderCircle,
+  RotateCcw,
+  Send,
+  ShieldCheck,
+} from 'lucide-react';
 import PublicLayout from '@/components/layout/PublicLayout';
-import { Mail, MessageSquare, MapPin, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import api, { ApiError } from '@/lib/api';
 
+interface ContactForm {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  website: string;
+}
+
+interface ContactResponse {
+  message: string;
+  reference?: string;
+  createdAt?: string;
+}
+
+const EMPTY_FORM: ContactForm = { name: '', email: '', subject: '', message: '', website: '' };
+
+function getSubmitError(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 429) return 'Too many messages were sent from this connection. Please wait and try again.';
+    if (error.status >= 500) return 'The support inbox is temporarily unavailable. Your message was not submitted; please try again.';
+
+    const firstDetail = Array.isArray(error.data?.details) ? error.data.details[0] : null;
+    if (firstDetail && typeof firstDetail.message === 'string') return firstDetail.message;
+    return error.message || 'Please review the form and try again.';
+  }
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return 'You appear to be offline. Reconnect and submit the form again.';
+  }
+  return 'Your message could not be submitted. Please try again.';
+}
+
 export default function ContactPage() {
-  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '', website: '' });
+  const [form, setForm] = useState<ContactForm>(EMPTY_FORM);
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [reference, setReference] = useState('');
 
-  const update = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const update = <Key extends keyof ContactForm>(key: Key, value: ContactForm[Key]) => {
+    setForm((current) => ({ ...current, [key]: value }));
+    if (error) setError('');
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (loading) return;
+
+    const payload: ContactForm = {
+      name: form.name.trim(),
+      email: form.email.trim(),
+      subject: form.subject.trim(),
+      message: form.message.trim(),
+      website: form.website,
+    };
+
+    if (payload.name.length < 2 || payload.subject.length < 3 || payload.message.length < 10) {
+      setError('Remove extra spaces and complete every field using the minimum lengths shown.');
+      return;
+    }
+
     setLoading(true);
     setError('');
+
     try {
-      const data = await api.post('/contact', form);
+      const data = await api.post<ContactResponse>('/contact', payload);
       setReference(data.reference || '');
       setSent(true);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Your message could not be sent. Please try again.');
+      setForm(EMPTY_FORM);
+    } catch (submitError: unknown) {
+      setError(getSubmitError(submitError));
     } finally {
       setLoading(false);
     }
   };
 
+  const resetForm = () => {
+    setSent(false);
+    setReference('');
+    setError('');
+    setForm(EMPTY_FORM);
+  };
+
   return (
     <PublicLayout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-14">
-          <p className="text-sm font-semibold text-primary-600 dark:text-primary-400 mb-3">Get in touch</p>
-          <h1 className="text-4xl font-display font-extrabold text-gray-900 dark:text-white mb-4">Contact Us</h1>
-          <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-            Have a question, feedback, or need help? We&apos;d love to hear from you.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
-          {/* Info column */}
-          <div className="lg:col-span-2 space-y-6">
-            {[
-              { icon: <Mail size={22} className="text-primary-600" />, title: 'Email', value: 'hello@reclaim.app', href: 'mailto:hello@reclaim.app' },
-              { icon: <MessageSquare size={22} className="text-emerald-600" />, title: 'Support', value: 'support@reclaim.app', href: 'mailto:support@reclaim.app' },
-              { icon: <MapPin size={22} className="text-amber-600" />, title: 'Based in', value: 'Sri Lanka 🇱🇰', href: null },
-            ].map(item => (
-              <div key={item.title} className="flex items-start gap-4 p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                <div className="w-11 h-11 rounded-xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
-                  {item.icon}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">{item.title}</p>
-                  {item.href ? (
-                    <a href={item.href} className="text-gray-900 dark:text-white font-medium hover:text-primary-600 dark:hover:text-primary-400 transition-colors text-sm">
-                      {item.value}
-                    </a>
-                  ) : (
-                    <p className="text-gray-900 dark:text-white font-medium text-sm">{item.value}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            <div className="p-5 bg-primary-50 dark:bg-primary-500/10 rounded-2xl border border-primary-100 dark:border-primary-500/20">
-              <p className="text-sm font-semibold text-primary-800 dark:text-primary-300 mb-1">Response time</p>
-              <p className="text-sm text-primary-700 dark:text-primary-400">Your message is securely added to the ReClaim support inbox for review.</p>
-            </div>
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
+        <header className="max-w-3xl">
+          <div className="inline-flex min-h-8 items-center gap-2 rounded-full bg-primary-50 px-3 text-xs font-bold uppercase tracking-[0.14em] text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
+            <Inbox size={14} aria-hidden="true" />
+            Contact support
           </div>
+          <h1 className="mt-4 font-display text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-5xl">Tell us what you need help with.</h1>
+          <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300 sm:text-base">
+            Submit a clear description and the ReClaim administration team can review it in the support inbox.
+          </p>
+        </header>
 
-          {/* Form column */}
-          <div className="lg:col-span-3">
+        <div className="mt-8 grid gap-5 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+          <aside className="space-y-3" aria-label="Before contacting support">
+            <Link href="/faq" className="group flex min-h-20 items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary-200 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-primary-500/30">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
+                <CircleHelp size={19} aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">Check quick answers <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span>
+                <span className="mt-1 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">Review matching, privacy, claims, maps, and account deletion.</span>
+              </span>
+            </Link>
+
+            <div className="flex min-h-20 items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                <ShieldCheck size={19} aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Keep sensitive details private</h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">Never send passwords, one-time codes, payment details, or an exact home address.</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-primary-700 p-5 text-white">
+              <h2 className="text-sm font-bold">For item-specific concerns</h2>
+              <p className="mt-2 text-xs leading-relaxed text-primary-100">Use “Report a concern” on the item page for moderation. Use this form for support questions, feedback, and technical problems.</p>
+            </div>
+          </aside>
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7" aria-labelledby="contact-form-title">
             {sent ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-16
-                              bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mb-4 animate-bounce-in">
-                  <CheckCircle size={32} className="text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white mb-2">Message sent!</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs">
-                  Thanks for reaching out. The support team can now review your message.
-                </p>
-                {reference && <p className="mt-3 text-xs font-mono text-gray-400">Reference: {reference}</p>}
+              <div role="status" aria-live="polite" className="flex min-h-80 flex-col items-center justify-center text-center">
+                <span className="flex size-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                  <CheckCircle2 size={28} aria-hidden="true" />
+                </span>
+                <h2 id="contact-form-title" className="mt-5 font-display text-2xl font-bold text-slate-950 dark:text-white">Message submitted</h2>
+                <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-600 dark:text-slate-300">Your message is now available in the ReClaim support inbox for review.</p>
+                {reference && (
+                  <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                    Reference: {reference}
+                  </p>
+                )}
+                <button type="button" onClick={resetForm} className="btn-outline mt-6 inline-flex items-center gap-2">
+                  <RotateCcw size={16} aria-hidden="true" />
+                  Send another message
+                </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit}
-                className="relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-8 space-y-5">
-                <div className="absolute -left-[9999px]" aria-hidden="true">
-                  <label htmlFor="website">Website</label>
-                  <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off"
-                    value={form.website} onChange={e => update('website', e.target.value)} />
+              <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-4">
+                <div>
+                  <h2 id="contact-form-title" className="font-display text-xl font-bold text-slate-950 dark:text-white">Support message</h2>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">All fields are required. Character limits are shown below.</p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+                <div className="absolute left-[-9999px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
+                  <label htmlFor="contact-website">Website</label>
+                  <input id="contact-website" name="website" type="text" tabIndex={-1} autoComplete="off" maxLength={200} disabled={loading} value={form.website} onChange={(event) => update('website', event.target.value)} />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Name</label>
-                    <input type="text" value={form.name} onChange={e => update('name', e.target.value)}
-                      placeholder="Your name" required minLength={2} maxLength={80} autoComplete="name" className="input-field" />
+                    <label htmlFor="contact-name" className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200">Name</label>
+                    <input id="contact-name" name="name" type="text" value={form.name} onChange={(event) => update('name', event.target.value)} required minLength={2} maxLength={80} autoComplete="name" disabled={loading} className="input-field" />
+                    <p className="mt-1 text-right text-[11px] tabular-nums text-slate-400">{form.name.length}/80</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
-                    <input type="email" value={form.email} onChange={e => update('email', e.target.value)}
-                      placeholder="you@example.com" required maxLength={254} autoComplete="email" className="input-field" />
+                    <label htmlFor="contact-email" className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200">Email</label>
+                    <input id="contact-email" name="email" type="email" value={form.email} onChange={(event) => update('email', event.target.value)} required maxLength={254} autoComplete="email" inputMode="email" disabled={loading} className="input-field" />
+                    <p className="mt-1 text-right text-[11px] tabular-nums text-slate-400">{form.email.length}/254</p>
                   </div>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Subject</label>
-                  <input type="text" value={form.subject} onChange={e => update('subject', e.target.value)}
-                    placeholder="What's this about?" required minLength={3} maxLength={120} className="input-field" />
+                  <label htmlFor="contact-subject" className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200">Subject</label>
+                  <input id="contact-subject" name="subject" type="text" value={form.subject} onChange={(event) => update('subject', event.target.value)} required minLength={3} maxLength={120} autoComplete="off" disabled={loading} className="input-field" />
+                  <p className="mt-1 text-right text-[11px] tabular-nums text-slate-400">{form.subject.length}/120</p>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Message</label>
-                  <textarea value={form.message} onChange={e => update('message', e.target.value)}
-                    placeholder="Tell us more…" required minLength={10} maxLength={3000} rows={5}
-                    className="input-field resize-none" />
+                  <label htmlFor="contact-message" className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200">Message</label>
+                  <textarea id="contact-message" name="message" value={form.message} onChange={(event) => update('message', event.target.value)} required minLength={10} maxLength={3000} rows={6} disabled={loading} aria-describedby="contact-message-help" className="input-field resize-y" />
+                  <div id="contact-message-help" className="mt-1 flex items-start justify-between gap-3 text-[11px] text-slate-400">
+                    <span>Include the report title or error details when relevant.</span>
+                    <span className="shrink-0 tabular-nums">{form.message.length}/3000</span>
+                  </div>
                 </div>
+
                 {error && (
-                  <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
-                    <AlertCircle size={17} className="mt-0.5 shrink-0" /> {error}
+                  <div role="alert" aria-live="assertive" className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                    <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
+                    <span>{error}</span>
                   </div>
                 )}
-                <button type="submit" disabled={loading}
-                  className="w-full btn-primary py-3 flex items-center justify-center gap-2">
-                  {loading ? (
-                    <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                    </svg> Sending…</>
-                  ) : (
-                    <><Send size={16} /> Send Message</>
-                  )}
+
+                <button type="submit" disabled={loading} className="btn-primary inline-flex w-full items-center justify-center gap-2 sm:w-auto">
+                  {loading ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Send size={17} aria-hidden="true" />}
+                  {loading ? 'Submitting…' : 'Submit message'}
                 </button>
               </form>
             )}
-          </div>
+          </section>
         </div>
       </div>
     </PublicLayout>

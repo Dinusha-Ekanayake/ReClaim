@@ -1,7 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, LoaderCircle } from 'lucide-react';
 import { useNotificationStore } from '@/lib/store/notificationStore';
 import { cn, timeAgo } from '@/lib/utils';
 
@@ -18,16 +18,16 @@ const TYPE_ICONS: Record<string, string> = {
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const { notifications, unreadCount, isLoading, error, fetch, markRead, markAllRead } = useNotificationStore();
+  const { notifications, unreadCount, total, hasNext, isLoading, isLoadingMore, error, fetch, loadMore, markRead, markAllRead } = useNotificationStore();
 
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => { void fetch(); }, [fetch]);
 
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white mb-1">Notifications</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">{unreadCount} unread</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">{unreadCount} unread{total > 0 ? ` · showing ${notifications.length} of ${total}` : ''}</p>
         </div>
         {unreadCount > 0 && (
           <button onClick={markAllRead}
@@ -63,7 +63,7 @@ export default function NotificationsPage() {
           </div>
         ) : notifications.map(n => (
           <button key={n.id}
-            onClick={() => { markRead(n.id); if (n.link) router.push(n.link); }}
+            onClick={() => { void markRead(n.id); if (n.link) router.push(n.link); }}
             className={cn('w-full flex items-start gap-4 p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors',
               !n.isRead && 'bg-blue-50/40 dark:bg-primary-500/10')}>
             <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg',
@@ -83,6 +83,14 @@ export default function NotificationsPage() {
           </button>
         ))}
       </div>
+      {hasNext && (
+        <div className="flex justify-center">
+          <button type="button" onClick={() => void loadMore()} disabled={isLoadingMore} className="btn-outline inline-flex min-w-48 items-center justify-center gap-2 px-4 py-2 text-sm">
+            {isLoadingMore && <LoaderCircle size={15} className="animate-spin" aria-hidden="true" />}
+            {isLoadingMore ? 'Loading…' : 'Load older notifications'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

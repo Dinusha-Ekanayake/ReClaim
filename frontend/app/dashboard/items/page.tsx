@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/authStore';
-import api from '@/lib/api';
+import api, { ApiError } from '@/lib/api';
 import ItemCard from '@/components/items/ItemCard';
+import { Pagination } from '@/components/shared/Pagination';
 import { cn } from '@/lib/utils';
 
 const FILTERS = [
@@ -22,22 +23,45 @@ export default function MyItemsPage() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState(0);
   const [page, setPage] = useState(1);
+  const [error, setError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
 
   const f = FILTERS[activeFilter];
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setItems([]);
+      setTotal(0);
+      setLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
     setLoading(true);
+    setError('');
     api.get('/users/me/items', {
       page, limit: 12,
       ...(f.type && { type: f.type }),
       ...(f.status && { status: f.status }),
       ...(!f.status && !f.type && { status: undefined }),
-    }).then(data => {
-      setItems(data.items);
-      setTotal(data.total);
-    }).finally(() => setLoading(false));
-  }, [user?.id, activeFilter, page]);
+    }, { signal: controller.signal }).then(data => {
+      if (controller.signal.aborted) return;
+      setItems(data.items ?? []);
+      const nextTotal = data.total ?? 0;
+      setTotal(nextTotal);
+      const availablePages = Math.max(Math.ceil(nextTotal / 12), 1);
+      if (page > availablePages) setPage(availablePages);
+    }).catch((requestError) => {
+      if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+      setItems([]);
+      setTotal(0);
+      setError(requestError instanceof ApiError ? requestError.message : 'Could not load your items. Please try again.');
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
+
+    return () => controller.abort();
+  }, [user?.id, activeFilter, page, retryKey]);
 
   return (
     <div className="space-y-6">
@@ -77,6 +101,14 @@ export default function MyItemsPage() {
             </div>
           ))}
         </div>
+      ) : error ? (
+        <div role="alert" className="card p-10 text-center">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Your items could not be loaded</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">{error}</p>
+          <button type="button" onClick={() => setRetryKey(key => key + 1)} className="btn-primary mt-5 inline-flex items-center gap-2">
+            <RefreshCw size={15} aria-hidden="true" /> Try again
+          </button>
+        </div>
       ) : items.length === 0 ? (
         <div className="card p-16 text-center">
           <div className="text-5xl mb-4">📭</div>
@@ -95,19 +127,7 @@ export default function MyItemsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {items.map(item => <ItemCard key={item.id} item={item} showStatus />)}
           </div>
-          {total > 12 && (
-            <div className="flex justify-center gap-2 mt-4">
-              <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800">
-                Previous
-              </button>
-              <span className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">Page {page}</span>
-              <button disabled={page * 12 >= total} onClick={() => setPage(p => p + 1)}
-                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800">
-                Next
-              </button>
-            </div>
-          )}
+          <Pagination page={page} pages={Math.ceil(total / 12)} onPageChange={setPage} className="mt-4" />
         </>
       )}
     </div>

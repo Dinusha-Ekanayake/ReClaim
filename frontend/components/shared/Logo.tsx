@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import Image from 'next/image';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 interface LogoProps {
@@ -7,34 +7,51 @@ interface LogoProps {
   href?: string;
   className?: string;
   showText?: boolean;
-  textColor?: string;
 }
 
 const SIZES = {
-  sm:  { box: 'w-8 h-8 rounded-xl text-base',  text: 'text-lg'  },
-  md:  { box: 'w-10 h-10 rounded-xl text-lg',  text: 'text-xl'  },
-  lg:  { box: 'w-14 h-14 rounded-2xl text-2xl', text: 'text-3xl' },
-  xl:  { box: 'w-20 h-20 rounded-3xl text-3xl', text: 'text-4xl' },
+  sm: { icon: 'h-8 w-8 rounded-xl', logo: 'w-20' },
+  md: { icon: 'h-10 w-10 rounded-xl', logo: 'w-24' },
+  lg: { icon: 'h-14 w-14 rounded-2xl', logo: 'w-32' },
+  xl: { icon: 'h-20 w-20 rounded-3xl', logo: 'w-40' },
 };
 
 export function LogoIcon({ size = 'md', className }: { size?: LogoProps['size']; className?: string }) {
-  const s = SIZES[size ?? 'md'];
+  const classes = SIZES[size ?? 'md'].icon;
   return (
-    <div className={cn('flex-shrink-0', s.box, className)}>
-      <Image src="/favicon.png" alt="" width={80} height={80} className="w-full h-full object-contain" priority />
-    </div>
+    <span className={cn('relative block flex-shrink-0 overflow-hidden', classes, className)} aria-hidden="true">
+      <Image
+        src="/favicon.png"
+        alt=""
+        fill
+        sizes="80px"
+        className="object-contain"
+        priority
+      />
+    </span>
   );
 }
 
 export default function Logo({ size = 'md', href = '/', className, showText = true }: LogoProps) {
-  const inner = (
-    <div className={cn('flex items-center gap-2.5 group', className)}>
-      {showText ? (
-        <Image src="/logo.png" alt="ReClaim — Find what matters. Return what's lost." width={180} height={180}
-          className={cn('h-auto object-contain', size === 'sm' ? 'w-28' : size === 'md' ? 'w-32' : size === 'lg' ? 'w-40' : 'w-48')} priority />
-      ) : <LogoIcon size={size} className="group-hover:scale-105 transition-transform duration-200" />}
-    </div>
+  const content = showText ? (
+    <Image
+      src="/logo.png"
+      alt="ReClaim"
+      width={1250}
+      height={1250}
+      sizes="160px"
+      className={cn('h-auto rounded-2xl bg-white object-contain', SIZES[size].logo)}
+      priority
+    />
+  ) : (
+    <LogoIcon size={size} />
   );
 
-  return href ? <Link href={href}>{inner}</Link> : inner;
+  const inner = <span className={cn('inline-flex items-center', className)}>{content}</span>;
+
+  return href ? (
+    <Link href={href} aria-label="ReClaim home" className="inline-flex rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-950">
+      {inner}
+    </Link>
+  ) : inner;
 }

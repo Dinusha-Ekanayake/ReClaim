@@ -80,18 +80,17 @@
 //   return str.length > length ? str.slice(0, length) + '...' : str;
 // }
 
-// export function buildImageUrl(path: string) {
-//   if (!path) return '/placeholder-item.png';
-//   if (path.startsWith('http')) return path;
-//   return path;
-// }
-
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { formatDistanceToNow, format } from 'date-fns';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+export function toLocalDateInputValue(date = new Date()): string {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
 }
 
 function parseValidDate(date?: string | Date | null): Date | null {

@@ -1,97 +1,198 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, Eye, EyeOff, KeyRound } from 'lucide-react';
-import { LogoIcon } from '@/components/shared/Logo';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle } from 'lucide-react';
+import AuthShell from '@/app/auth/AuthShell';
+import { useLanguage } from '@/components/providers/LanguageProvider';
 import api, { ApiError } from '@/lib/api';
+import { useAuthStore } from '@/lib/store/authStore';
 
 function ResetPasswordForm() {
-  const token = useSearchParams().get('token') || '';
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { t } = useLanguage();
+  const clearSession = useAuthStore(state => state.clearSession);
+  const requestId = useRef(0);
+  const [token, setToken] = useState(() => searchParams.get('token') || '');
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [complete, setComplete] = useState(false);
   const [error, setError] = useState('');
 
-  const submit = async (event: React.FormEvent) => {
+  useLayoutEffect(() => {
+    const url = new URL(window.location.href);
+    const fragment = new URLSearchParams(url.hash.replace(/^#/, ''));
+    const fragmentToken = fragment.get('token');
+    if (fragmentToken) setToken(fragmentToken);
+    url.searchParams.delete('token');
+    fragment.delete('token');
+    url.hash = fragment.size ? `#${fragment.toString()}` : '';
+    const cleanPath = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState(window.history.state, '', cleanPath);
+  }, []);
+
+  useEffect(() => () => {
+    requestId.current += 1;
+  }, []);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password) || new TextEncoder().encode(password).length > 72) {
-      setError('Use 8–72 characters with uppercase, lowercase, and a number.');
+    const passwordBytes = new TextEncoder().encode(password).length;
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password) || passwordBytes > 72) {
+      setError(t('reset.ruleError'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('reset.mismatch'));
       return;
     }
+
+    const currentRequest = ++requestId.current;
     setLoading(true);
     try {
       await api.post('/auth/reset-password', { token, password });
+      if (currentRequest !== requestId.current) return;
+      clearSession();
       setComplete(true);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not reset the password.');
+      router.replace('/auth/login?reset=success');
+    } catch (requestError) {
+      if (currentRequest !== requestId.current) return;
+      setError(requestError instanceof ApiError ? requestError.message : t('reset.error'));
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
   };
 
-  if (!/^[a-f0-9]{64}$/i.test(token)) {
+  if (complete) {
     return (
-      <div className="text-center">
-        <KeyRound size={32} className="mx-auto mb-4 text-red-500" />
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Invalid reset link</h1>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Request a new link to continue.</p>
-        <Link href="/auth/forgot-password" className="btn-primary mt-6 inline-flex">Request another link</Link>
+      <div role="status" className="py-4 text-center">
+        <CheckCircle2 size={38} className="mx-auto mb-4 text-emerald-600" aria-hidden="true" />
+        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{t('reset.successTitle')}</h1>
+        <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{t('reset.successBody')}</p>
+        <Link href="/auth/login?reset=success" className="btn-primary mt-6 inline-flex min-h-12 items-center justify-center px-6">{t('reset.signIn')}</Link>
       </div>
     );
   }
 
-  if (complete) {
+  if (!/^[a-f0-9]{64}$/i.test(token)) {
     return (
-      <div className="text-center">
-        <CheckCircle2 size={36} className="mx-auto mb-4 text-emerald-500" />
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Password updated</h1>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">All previous sessions have been signed out.</p>
-        <Link href="/auth/login" className="btn-primary mt-6 inline-flex">Sign in</Link>
+      <div role="alert" className="py-4 text-center">
+        <KeyRound size={36} className="mx-auto mb-4 text-red-500" aria-hidden="true" />
+        <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">{t('reset.invalidTitle')}</h1>
+        <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{t('reset.invalidBody')}</p>
+        <Link href="/auth/forgot-password" className="btn-primary mt-6 inline-flex min-h-12 items-center justify-center px-6">{t('reset.requestAnother')}</Link>
       </div>
     );
   }
 
   return (
-    <form onSubmit={submit} className="space-y-5">
-      <div className="mb-7 flex items-center gap-3">
-        <LogoIcon size="md" />
-        <div><h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">Choose a new password</h1><p className="text-sm text-gray-500 dark:text-gray-400">This link can only be used once.</p></div>
+    <>
+      <div className="mb-6">
+        <h1 className="text-3xl font-display font-bold tracking-tight text-gray-900 dark:text-white">{t('reset.title')}</h1>
+        <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{t('reset.subtitle')}</p>
       </div>
-      <div>
-        <label htmlFor="password" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">New password</label>
-        <div className="relative">
-          <input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={event => setPassword(event.target.value)} required minLength={8} maxLength={72} autoComplete="new-password" className="input-field pr-11" />
-          <button type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-            {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-          </button>
+
+      <form onSubmit={submit} className="space-y-4" aria-busy={loading}>
+        <div>
+          <label htmlFor="new-password" className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">{t('reset.newPassword')}</label>
+          <div className="relative">
+            <input
+              id="new-password"
+              name="new-password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={event => setPassword(event.target.value)}
+              required
+              minLength={8}
+              maxLength={72}
+              autoComplete="new-password"
+              aria-describedby="reset-password-hint"
+              className="input-field min-h-12 pr-12"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(value => !value)}
+              aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+              aria-pressed={showPassword}
+              className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+            >
+              {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+            </button>
+          </div>
+          <p id="reset-password-hint" className="mt-1.5 text-xs leading-5 text-gray-500 dark:text-gray-400">{t('reset.ruleError')}</p>
         </div>
-      </div>
-      <div>
-        <label htmlFor="confirm-password" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Confirm password</label>
-        <input id="confirm-password" type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} required minLength={8} maxLength={72} autoComplete="new-password" className="input-field" />
-      </div>
-      {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">{error}</p>}
-      <button disabled={loading} className="btn-primary w-full py-3">{loading ? 'Updating…' : 'Update password'}</button>
-    </form>
+
+        <div>
+          <label htmlFor="confirm-password" className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">{t('reset.confirmPassword')}</label>
+          <div className="relative">
+            <input
+              id="confirm-password"
+              name="confirm-password"
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={event => setConfirmPassword(event.target.value)}
+              required
+              minLength={8}
+              maxLength={72}
+              autoComplete="new-password"
+              className="input-field min-h-12 pr-12"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(value => !value)}
+              aria-label={showConfirmPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+              aria-pressed={showConfirmPassword}
+              className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+            >
+              {showConfirmPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="space-y-2">
+            <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+              <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>{error}</span>
+            </div>
+            <Link href="/auth/forgot-password" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary-700 hover:underline dark:text-primary-400">
+              {t('reset.requestAnother')}
+            </Link>
+          </div>
+        )}
+
+        <button type="submit" disabled={loading} className="btn-primary flex min-h-12 w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
+          {loading && <LoaderCircle size={17} className="animate-spin" aria-hidden="true" />}
+          {loading ? t('reset.submitting') : t('reset.submit')}
+        </button>
+      </form>
+    </>
+  );
+}
+
+function ResetFallback() {
+  const { t } = useLanguage();
+  return (
+    <div role="status" className="flex min-h-72 flex-col items-center justify-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+      <LoaderCircle className="animate-spin text-primary-600" size={24} aria-hidden="true" />
+      {t('loading.label')}
+    </div>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
-      <div className="absolute inset-0 bg-white/65 backdrop-blur-[2px] dark:bg-gray-950/70" />
-      <div className="relative w-full max-w-md rounded-[2rem] border border-white/80 bg-white/90 p-7 shadow-2xl shadow-blue-200/30 backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/90 dark:shadow-black/30 sm:p-9">
-        <Suspense fallback={<div className="skeleton h-72 rounded-2xl" />}><ResetPasswordForm /></Suspense>
-      </div>
-    </main>
+    <AuthShell>
+      <Suspense fallback={<ResetFallback />}>
+        <ResetPasswordForm />
+      </Suspense>
+    </AuthShell>
   );
 }

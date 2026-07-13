@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Camera, Save, AlertCircle, CheckCircle, Trash2, X } from 'lucide-react';
@@ -28,6 +29,8 @@ export default function SettingsPage() {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const cancelDeleteRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -39,20 +42,6 @@ export default function SettingsPage() {
       showPhone: user.showPhone || false,
     });
   }, [user?.id]);
-
-  useEffect(() => {
-    if (!deleteOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !deleting) setDeleteOpen(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [deleteOpen, deleting]);
 
   const update = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
 
@@ -108,14 +97,13 @@ export default function SettingsPage() {
     event.preventDefault();
     if (deleteConfirmation !== 'DELETE') return;
     setDeleting(true);
-    setError('');
+    setDeleteError('');
     try {
       await api.delete('/users/me', { password: deletePassword, confirmation: deleteConfirmation });
       clearSession();
       router.replace('/');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not delete the account.');
-      setDeleteOpen(false);
+      setDeleteError(err instanceof ApiError ? err.message : 'Could not delete the account.');
     } finally {
       setDeleting(false);
     }
@@ -125,7 +113,7 @@ export default function SettingsPage() {
     <div className="max-w-xl space-y-8">
       <div>
         <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white mb-1">Account Settings</h1>
-        <p className="text-gray-500 dark:text-gray-400 text-sm">Manage your profile and preferences</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">Manage what appears on your public profile and item reports</p>
       </div>
 
       {/* Avatar */}
@@ -141,45 +129,49 @@ export default function SettingsPage() {
                 {getAvatarFallback(user?.name || 'U')}
               </div>
             )}
-            <label className="absolute bottom-0 right-0 w-7 h-7 bg-primary-600 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-primary-700 transition-colors">
+            <label htmlFor="profile-photo" aria-label="Choose a new public profile photo" className="absolute bottom-0 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-primary-600 text-white transition-colors hover:bg-primary-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2">
               {avatarLoading ? (
                 <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <Camera size={13} />
               )}
-              <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" onChange={handleAvatarChange} />
+              <input id="profile-photo" name="profile-photo" type="file" accept="image/jpeg,image/png,image/webp,image/avif" aria-label="Choose profile photo" className="sr-only" onChange={handleAvatarChange} />
             </label>
           </div>
           <div>
             <p className="text-sm font-semibold text-gray-900 dark:text-white">{user?.name}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">JPG, PNG or WebP. Max 5MB.</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Public on your profile and reports. JPG, PNG, WebP or AVIF; max 5MB.</p>
           </div>
         </div>
       </div>
 
       {/* Profile Info */}
       <div className="card p-6 space-y-5">
-        <h2 className="font-semibold text-gray-900 dark:text-white">Profile Information</h2>
-
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
-          <input type="text" value={form.name} onChange={e => update('name', e.target.value)}
-            className="input-field" maxLength={50} />
+          <h2 className="font-semibold text-gray-900 dark:text-white">Public profile information</h2>
+          <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">Your name, bio, profile location and photo can be viewed without signing in. Do not enter a home address or private ownership detail.</p>
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Bio</label>
-          <textarea value={form.bio} onChange={e => update('bio', e.target.value)}
+          <label htmlFor="profile-name" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Full name <span className="font-normal text-gray-400">(public)</span></label>
+          <input id="profile-name" name="name" type="text" value={form.name} onChange={e => update('name', e.target.value)}
+            className="input-field" maxLength={50} autoComplete="name" />
+        </div>
+
+        <div>
+          <label htmlFor="profile-bio" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Bio <span className="font-normal text-gray-400">(public)</span></label>
+          <textarea id="profile-bio" name="bio" value={form.bio} onChange={e => update('bio', e.target.value)}
             rows={3} placeholder="Tell others a bit about yourself..."
-            className="input-field resize-none" maxLength={500} />
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{form.bio.length}/500</p>
+            className="input-field resize-none" maxLength={500} aria-describedby="profile-bio-count" />
+          <p id="profile-bio-count" className="mt-1 flex justify-between gap-3 text-xs text-gray-400 dark:text-gray-500"><span>Visible on your public profile.</span><span className="tabular-nums">{form.bio.length}/500</span></p>
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Location</label>
-          <input type="text" value={form.location} onChange={e => update('location', e.target.value)}
-            placeholder="e.g. Colombo, Sri Lanka" maxLength={160} className="input-field" />
+          <label htmlFor="profile-location" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Profile location <span className="font-normal text-gray-400">(public)</span></label>
+          <input id="profile-location" name="location" type="text" value={form.location} onChange={e => update('location', e.target.value)}
+            placeholder="e.g. Colombo, Sri Lanka" maxLength={160} autoComplete="address-level2" className="input-field" />
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Use a broad city or district, not a street address.</p>
         </div>
       </div>
 
@@ -188,15 +180,15 @@ export default function SettingsPage() {
         <h2 className="font-semibold text-gray-900 dark:text-white">Contact & Privacy</h2>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Phone Number</label>
-          <input type="tel" value={form.phone} onChange={e => update('phone', e.target.value)}
+          <label htmlFor="profile-phone" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Phone number <span className="font-normal text-gray-400">(private by default)</span></label>
+          <input id="profile-phone" name="phone" type="tel" value={form.phone} onChange={e => update('phone', e.target.value)}
             placeholder="+94 77 000 0000" maxLength={20} autoComplete="tel" className="input-field" />
         </div>
 
         <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
           <div>
             <p className="text-sm font-semibold text-gray-900 dark:text-white">Show phone on listings</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Allow others to call you directly from your item pages</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">A number appears only when this and contact sharing on that specific report are both enabled.</p>
           </div>
           <button onClick={() => update('showPhone', !form.showPhone)}
             type="button" role="switch" aria-checked={form.showPhone} aria-label="Show phone number on listings"
@@ -225,33 +217,74 @@ export default function SettingsPage() {
       </button>
 
       {user?.role === 'USER' && (
-        <div className="rounded-2xl border border-red-200 bg-red-50/80 p-6 dark:border-red-500/20 dark:bg-red-500/5">
+        <Dialog.Root
+          open={deleteOpen}
+          onOpenChange={(open) => {
+            if (deleting) return;
+            setDeleteOpen(open);
+            setDeleteError('');
+            if (!open) {
+              setDeletePassword('');
+              setDeleteConfirmation('');
+            }
+          }}
+        >
+          <div className="rounded-2xl border border-red-200 bg-red-50/80 p-6 dark:border-red-500/20 dark:bg-red-500/5">
           <h2 className="font-semibold text-red-900 dark:text-red-300">Delete account</h2>
-          <p className="mt-1 text-sm leading-6 text-red-700/80 dark:text-red-300/70">Permanently deletes your profile, listings, claims, chats, and uploaded assets. This cannot be undone.</p>
-          <button type="button" onClick={() => setDeleteOpen(true)} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-red-300 px-4 py-2.5 text-sm font-bold text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10">
-            <Trash2 size={15} /> Delete my account
-          </button>
-        </div>
-      )}
-
-      {deleteOpen && (
-        <div role="dialog" aria-modal="true" aria-labelledby="delete-account-title" className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/65 p-4 backdrop-blur-sm">
-          <form onSubmit={handleDeleteAccount} className="relative w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl dark:bg-gray-900">
-            <button type="button" aria-label="Close" onClick={() => setDeleteOpen(false)} className="absolute right-4 top-4 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"><X size={18} /></button>
-            <h2 id="delete-account-title" className="text-xl font-bold text-gray-900 dark:text-white">Permanently delete account?</h2>
-            <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">Enter your password and type <strong className="text-red-600">DELETE</strong> to confirm.</p>
-            <div className="mt-5 space-y-4">
-              <input type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} required maxLength={128} autoComplete="current-password" placeholder="Current password" className="input-field" />
-              <input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} required maxLength={6} autoComplete="off" placeholder="Type DELETE" className="input-field" />
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setDeleteOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">Cancel</button>
-              <button disabled={deleting || deleteConfirmation !== 'DELETE'} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
-                <Trash2 size={15} /> {deleting ? 'Deleting…' : 'Delete permanently'}
+          <p className="mt-1 text-sm leading-6 text-red-700/80 dark:text-red-300/70">Permanently deletes your account, listings, claims you submitted, and conversations you participated in. ReClaim also requests removal of associated uploads; provider caches or backups may expire separately. This cannot be undone.</p>
+            <Dialog.Trigger asChild>
+              <button type="button" className="mt-4 inline-flex items-center gap-2 rounded-xl border border-red-300 px-4 py-2.5 text-sm font-bold text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10">
+                <Trash2 size={15} aria-hidden="true" /> Delete my account
               </button>
-            </div>
-          </form>
-        </div>
+            </Dialog.Trigger>
+          </div>
+
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 z-[80] bg-gray-950/65 backdrop-blur-sm data-[state=open]:animate-fade-in" />
+            <Dialog.Content
+              onEscapeKeyDown={(event) => { if (deleting) event.preventDefault(); }}
+              onPointerDownOutside={(event) => { if (deleting) event.preventDefault(); }}
+              onOpenAutoFocus={(event) => {
+                event.preventDefault();
+                cancelDeleteRef.current?.focus();
+              }}
+              className="fixed left-1/2 top-1/2 z-[81] max-h-[90dvh] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-gray-200 bg-white p-7 shadow-2xl outline-none dark:border-gray-700 dark:bg-gray-900"
+            >
+              <form onSubmit={handleDeleteAccount} aria-busy={deleting}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <Dialog.Title className="text-xl font-bold text-gray-900 dark:text-white">Permanently delete account?</Dialog.Title>
+                    <Dialog.Description className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">Enter your password and type <strong className="text-red-600">DELETE</strong> to confirm. This action cannot be undone.</Dialog.Description>
+                  </div>
+                  <Dialog.Close asChild>
+                    <button type="button" disabled={deleting} aria-label="Close delete account dialog" className="flex size-11 shrink-0 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-gray-800"><X size={18} aria-hidden="true" /></button>
+                  </Dialog.Close>
+                </div>
+
+                <div className="mt-5 space-y-4">
+                  <div>
+                    <label htmlFor="delete-account-password" className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Current password</label>
+                    <input id="delete-account-password" name="current-password" type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} required maxLength={128} autoComplete="current-password" className="input-field" aria-invalid={Boolean(deleteError)} />
+                  </div>
+                  <div>
+                    <label htmlFor="delete-account-confirmation" className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Type DELETE to confirm</label>
+                    <input id="delete-account-confirmation" name="delete-confirmation" value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} required maxLength={6} autoComplete="off" placeholder="DELETE" className="input-field" />
+                  </div>
+                  {deleteError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">{deleteError}</p>}
+                </div>
+
+                <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <Dialog.Close asChild>
+                    <button ref={cancelDeleteRef} type="button" disabled={deleting} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-300 dark:hover:bg-gray-800">Cancel</button>
+                  </Dialog.Close>
+                  <button type="submit" disabled={deleting || deleteConfirmation !== 'DELETE'} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
+                    <Trash2 size={15} aria-hidden="true" /> {deleting ? 'Deleting…' : 'Delete permanently'}
+                  </button>
+                </div>
+              </form>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
       )}
     </div>
   );

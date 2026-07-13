@@ -14,6 +14,7 @@ import { LogoIcon } from '@/components/shared/Logo';
 import LanguageSelector from '@/components/shared/LanguageSelector';
 import ThemeToggle from '@/components/shared/ThemeToggle';
 import { useLanguage } from '@/components/providers/LanguageProvider';
+import { toast } from '@/components/ui/toaster';
 
 interface NavLink {
   href: string;
@@ -40,7 +41,9 @@ export default function Navbar() {
 
   const router   = useRouter();
   const pathname = usePathname();
-  const currentType = useSearchParams().get('type');
+  const searchParams = useSearchParams();
+  const queryKey = searchParams.toString();
+  const currentType = searchParams.get('type');
   const { t } = useLanguage();
   const user     = useAuthStore(s => s.user);
   const logout   = useAuthStore(s => s.logout);
@@ -67,7 +70,7 @@ export default function Navbar() {
     setMobileOpen(false);
     setNotifOpen(false);
     setProfileOpen(false);
-  }, [pathname]);
+  }, [pathname, queryKey]);
 
   // ── Click-outside to close dropdowns ───────────────────────────────────────
   useEffect(() => {
@@ -101,8 +104,12 @@ export default function Navbar() {
   const handleLogout = async () => {
     setProfileOpen(false);
     setMobileOpen(false);
-    await logout();
-    router.push('/');
+    try {
+      await logout();
+      router.push('/');
+    } catch {
+      toast({ title: 'Could not sign out', description: 'Your session is still active. Check your connection and try again.', variant: 'destructive' });
+    }
   };
 
   // Active-state for a nav link, query-aware for the Lost/Found links
@@ -126,18 +133,18 @@ export default function Navbar() {
         )}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
+          <div className="flex h-20 min-w-0 items-center justify-between gap-2">
 
             {/* ── Logo ─────────────────────────────────────────── */}
-            <Link href="/" aria-label="ReClaim home" className="flex items-center gap-3 flex-shrink-0 group">
+            <Link href="/" aria-label="ReClaim home" className="group flex min-w-0 flex-shrink items-center gap-2.5 sm:gap-3">
               <LogoIcon size="md" className="group-hover:scale-105 transition-transform duration-200" />
-              <span className="font-display font-extrabold text-2xl text-gray-900 dark:text-white tracking-tight">
+              <span className="truncate font-display text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
                 Re<span className="text-primary-600 dark:text-primary-400">Claim</span>
               </span>
             </Link>
 
             {/* ── Desktop nav links ─────────────────────────────── */}
-            <div className="hidden md:flex items-center gap-1">
+            <div className="hidden lg:flex items-center gap-1">
               {NAV_LINKS.map(link => {
                 const active = isLinkActive(link);
                 return (
@@ -160,30 +167,29 @@ export default function Navbar() {
             </div>
 
             {/* ── Right actions ─────────────────────────────────── */}
-            <div className="flex items-center gap-1">
+            <div className="flex min-w-0 flex-shrink-0 items-center gap-0.5 sm:gap-1">
 
               {/* Search */}
               <Link
-                href="/search"
+                href="/items"
                 aria-label="Search items"
-                className="p-2.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800
-                           rounded-xl transition-all duration-200"
+                className="flex size-11 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
               >
                 <Search size={20} />
               </Link>
 
               {/* Theme toggle */}
-              <ThemeToggle />
+              <div className="hidden lg:block"><ThemeToggle /></div>
 
               {/* Language */}
-              <LanguageSelector />
+              <div className="hidden lg:block"><LanguageSelector /></div>
 
               {isLoggedIn ? (
                 <>
                   {/* Post Item */}
                   <Link
                     href="/items/new"
-                    className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-xl
+                    className="hidden lg:flex items-center gap-1.5 px-4 py-2 rounded-xl
                                bg-primary-600 text-white text-sm font-semibold
                                hover:bg-primary-700 active:scale-95
                                transition-all duration-200 shadow-sm hover:shadow-md ml-1"
@@ -196,21 +202,21 @@ export default function Navbar() {
                   <Link
                     href="/chat"
                     aria-label={t('nav.messages')}
-                    className="hidden sm:flex p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800
+                    className="hidden size-11 items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 lg:flex
                                rounded-lg transition-all duration-200 relative"
                   >
                     <MessageSquare size={19} />
                   </Link>
 
                   {/* Notifications */}
-                  <div className="relative" ref={notifRef}>
+                  <div className="relative hidden lg:block" ref={notifRef}>
                     <button
                       type="button"
                       aria-label="Notifications"
                       aria-expanded={notifOpen}
                       aria-haspopup="true"
                       onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }}
-                      className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800
+                      className="flex size-11 items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800
                                  rounded-lg transition-all duration-200 relative"
                     >
                       <Bell size={19} />
@@ -283,14 +289,14 @@ export default function Navbar() {
                   </div>
 
                   {/* Profile dropdown */}
-                  <div className="relative" ref={profileRef}>
+                  <div className="relative hidden lg:block" ref={profileRef}>
                     <button
                       type="button"
                       aria-label="Account menu"
                       aria-expanded={profileOpen}
                       aria-haspopup="true"
                       onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }}
-                      className="flex items-center gap-1.5 pl-1.5 pr-2 py-1
+                      className="flex min-h-11 items-center gap-1.5 pl-1.5 pr-2 py-1
                                  rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
                     >
                       {user?.avatarUrl ? (
@@ -372,7 +378,7 @@ export default function Navbar() {
                 <div className="flex items-center gap-2 ml-1">
                   <Link
                     href="/auth/login"
-                    className="hidden sm:block text-sm font-medium text-gray-600 dark:text-gray-300
+                    className="hidden lg:block text-sm font-medium text-gray-600 dark:text-gray-300
                                hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800
                                transition-all duration-200"
                   >
@@ -380,7 +386,7 @@ export default function Navbar() {
                   </Link>
                   <Link
                     href="/auth/register"
-                    className="hidden sm:block px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-semibold
+                    className="hidden lg:block px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-semibold
                                hover:bg-primary-700 active:scale-95
                                transition-all duration-200 shadow-sm hover:shadow-md"
                   >
@@ -394,8 +400,7 @@ export default function Navbar() {
                 type="button"
                 aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
                 aria-expanded={mobileOpen}
-                className="md:hidden p-2 ml-1 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white
-                           hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+                className="ml-0.5 flex size-11 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white lg:hidden"
                 onClick={() => setMobileOpen(!mobileOpen)}
               >
                 {mobileOpen ? <X size={20} /> : <Menu size={20} />}
@@ -413,10 +418,10 @@ export default function Navbar() {
             type="button"
             aria-label="Close menu"
             onClick={() => setMobileOpen(false)}
-            className="md:hidden fixed inset-0 top-20 z-40 bg-black/30 dark:bg-black/50 animate-fade-in"
+            className="lg:hidden fixed inset-0 top-20 z-40 bg-black/30 dark:bg-black/50 animate-fade-in"
           />
           {/* Panel */}
-          <div className="md:hidden fixed top-20 left-0 right-0 z-50 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 shadow-lg animate-slide-in-down max-h-[calc(100vh-5rem)] overflow-y-auto">
+          <div className="lg:hidden fixed top-20 left-0 right-0 z-50 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 shadow-lg animate-slide-in-down max-h-[calc(100vh-5rem)] overflow-y-auto">
             <div className="px-4 py-3 space-y-1">
               {NAV_LINKS.map(link => {
                 const active = isLinkActive(link);
@@ -437,6 +442,15 @@ export default function Navbar() {
                   </Link>
                 );
               })}
+
+              <div className="my-2 border-t border-gray-100 dark:border-gray-800" />
+              <div className="flex min-h-12 flex-col gap-2 rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-xs font-semibold leading-5 text-gray-500 dark:text-gray-400">Language &amp; appearance</span>
+                <div className="flex min-w-0 items-center gap-1 self-stretch sm:self-auto">
+                  <ThemeToggle />
+                  <LanguageSelector className="min-w-0 flex-1 sm:flex-none" />
+                </div>
+              </div>
 
               {isLoggedIn ? (
                 <>
