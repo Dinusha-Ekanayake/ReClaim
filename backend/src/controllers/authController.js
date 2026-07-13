@@ -2,22 +2,50 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const prisma = require('../lib/prisma');
-const { sendPasswordResetEmail } = require('../services/emailService');
+const { sendEmailVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
+const {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} = require('../utils/tokenService');
+const { configuredFrontendOrigins } = require('../config/origins');
 
 const REFRESH_COOKIE = 'reclaim_refresh';
 const ACCESS_COOKIE = 'reclaim_access';
 const MAX_ACTIVE_SESSIONS = 10;
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 const digestToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+function frontendOrigin() {
+  return configuredFrontendOrigins()[0];
+}
+
+function newEmailVerification(userId) {
+  const token = crypto.randomBytes(32).toString('hex');
+  return {
+    token,
+    record: {
+      tokenHash: digestToken(token),
+      userId,
+      expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+    },
+    // Fragments are never sent in HTTP requests, keeping bearer tokens out of
+    // CDN, proxy, and access logs.
+    url: `${frontendOrigin()}/auth/verify-email#token=${encodeURIComponent(token)}`,
+  };
+}
 
 const refreshCookieOptions = () => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  // The web app calls the API through its same-origin Next.js proxy. Lax keeps
+  // refresh cookies first-party and prevents cross-site POSTs from sending them.
+  sameSite: 'lax',
   path: '/api/auth',
 });
 
-const accessCookieOptions = () => ({ ...refreshCookieOptions(), path: '/' });
+const accessCookieOptions = () => ({ ...refreshCookieOptions(), path: '/api' });
 
 function setRefreshCookie(res, token) {
   const decoded = jwt.decode(token);
@@ -62,18 +90,15 @@ function requestRefreshToken(req) {
 }
 
 const generateTokens = (userId) => {
-  const accessToken = jwt.sign(
-    { userId },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '15m', algorithm: 'HS256' }
-  );
-  const refreshToken = jwt.sign(
-    { userId },
-    process.env.JWT_REFRESH_SECRET,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d', algorithm: 'HS256' }
-  );
+  const accessToken = signAccessToken(userId);
+  // A random JWT ID keeps simultaneous sessions unique even though JWT
+  // timestamps have one-second precision.
+  const refreshToken = signRefreshToken(userId, crypto.randomUUID());
   return { accessToken, refreshToken };
 };
+
+// Kept exported so session-token invariants can be covered without a database.
+exports.generateTokens = generateTokens;
 
 async function storeRefreshToken(tx, userId, refreshToken) {
   const now = new Date();
@@ -115,13 +140,32 @@ exports.register = async (req, res, next) => {
         data: { name, email, password: hashedPassword },
         select: { id: true, name: true, email: true, role: true, avatarUrl: true, createdAt: true },
       });
-      const tokens = generateTokens(user.id);
-      await storeRefreshToken(tx, user.id, tokens.refreshToken);
-      return { user, ...tokens };
+      const verification = newEmailVerification(user.id);
+      await tx.emailVerificationToken.create({ data: verification.record });
+      return { user, verification };
     });
 
-    setAuthCookies(res, result.accessToken, result.refreshToken);
-    res.status(201).json({ user: result.user, accessToken: result.accessToken });
+    let emailSent = false;
+    try {
+      emailSent = await sendEmailVerificationEmail({
+        to: result.user.email,
+        name: result.user.name,
+        verificationUrl: result.verification.url,
+      });
+    } catch (emailError) {
+      console.error('Verification email delivery failed:', emailError.message);
+    }
+
+    res.status(201).json({
+      message: emailSent
+        ? 'Account created. Check your email to verify it before signing in.'
+        : 'Account created. Verification email is unavailable; request a new link to continue.',
+      requiresVerification: true,
+      emailSent,
+      ...(process.env.NODE_ENV !== 'production' && !emailSent
+        ? { devVerificationUrl: result.verification.url }
+        : {}),
+    });
   } catch (err) {
     next(err);
   }
@@ -138,6 +182,12 @@ exports.login = async (req, res, next) => {
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user.isVerified) {
+      return res.status(403).json({
+        error: 'Verify your email before signing in.',
+        code: 'EMAIL_NOT_VERIFIED',
+      });
+    }
 
     const { accessToken, refreshToken } = generateTokens(user.id);
 
@@ -150,6 +200,77 @@ exports.login = async (req, res, next) => {
     res.json({ user: safeUser, accessToken });
   } catch (err) {
     next(err);
+  }
+};
+
+// POST /api/auth/verify-email
+exports.verifyEmail = async (req, res, next) => {
+  try {
+    const tokenHash = digestToken(req.body.token);
+    const verification = await prisma.emailVerificationToken.findUnique({
+      where: { tokenHash },
+      include: { user: { select: { id: true, isBanned: true } } },
+    });
+    if (!verification || verification.expiresAt <= new Date() || verification.user.isBanned) {
+      return res.status(400).json({ error: 'This verification link is invalid or has expired' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.emailVerificationToken.deleteMany({
+        where: { id: verification.id, expiresAt: { gt: new Date() } },
+      });
+      if (claimed.count !== 1) {
+        const error = new Error('This verification link is invalid or has expired');
+        error.status = 400;
+        throw error;
+      }
+      await tx.user.update({
+        where: { id: verification.userId },
+        data: { isVerified: true },
+      });
+      await tx.emailVerificationToken.deleteMany({ where: { userId: verification.userId } });
+    });
+
+    // Verification links are bearer credentials that can be forwarded. Never
+    // turn one into a browser session: doing so could silently switch a victim
+    // into another person's account (login CSRF/account confusion).
+    res.json({ message: 'Email verified. Sign in to continue.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/auth/resend-verification
+exports.resendVerification = async (req, res, next) => {
+  const response = { message: 'If the account needs verification, a new link will be sent.' };
+  try {
+    if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
+      return res.status(503).json({ error: 'Verification email is temporarily unavailable' });
+    }
+    const user = await prisma.user.findUnique({
+      where: { email: req.body.email },
+      select: { id: true, name: true, email: true, isVerified: true, isBanned: true },
+    });
+    if (!user || user.isVerified || user.isBanned) return res.status(202).json(response);
+
+    const verification = newEmailVerification(user.id);
+    await prisma.$transaction([
+      prisma.emailVerificationToken.deleteMany({ where: { userId: user.id } }),
+      prisma.emailVerificationToken.create({ data: verification.record }),
+    ]);
+    try {
+      const sent = await sendEmailVerificationEmail({
+        to: user.email,
+        name: user.name,
+        verificationUrl: verification.url,
+      });
+      if (!sent && process.env.NODE_ENV !== 'production') response.devVerificationUrl = verification.url;
+    } catch (emailError) {
+      console.error('Verification email delivery failed:', emailError.message);
+    }
+    res.status(202).json(response);
+  } catch (error) {
+    next(error);
   }
 };
 
@@ -175,8 +296,7 @@ exports.forgotPassword = async (req, res, next) => {
       prisma.passwordResetToken.create({ data: { tokenHash, userId: user.id, expiresAt } }),
     ]);
 
-    const frontendOrigin = (process.env.FRONTEND_URL || 'http://localhost:3000').split(',')[0].trim().replace(/\/$/, '');
-    const resetUrl = `${frontendOrigin}/auth/reset-password?token=${encodeURIComponent(rawToken)}`;
+    const resetUrl = `${frontendOrigin()}/auth/reset-password#token=${encodeURIComponent(rawToken)}`;
     try {
       const sent = await sendPasswordResetEmail({ to: user.email, name: user.name, resetUrl });
       if (!sent && process.env.NODE_ENV !== 'production') response.devResetUrl = resetUrl;
@@ -215,7 +335,10 @@ exports.resetPassword = async (req, res, next) => {
         error.status = 400;
         throw error;
       }
-      await tx.user.update({ where: { id: resetToken.userId }, data: { password } });
+      await tx.user.update({
+        where: { id: resetToken.userId },
+        data: { password, isVerified: true },
+      });
       await tx.refreshToken.deleteMany({ where: { userId: resetToken.userId } });
       await tx.passwordResetToken.deleteMany({
         where: { userId: resetToken.userId, id: { not: resetToken.id } },
@@ -235,7 +358,7 @@ exports.refresh = async (req, res, next) => {
     const refreshToken = requestRefreshToken(req);
     if (!refreshToken) return res.status(401).json({ error: 'Refresh token required' });
 
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET, { algorithms: ['HS256'] });
+    const decoded = verifyRefreshToken(refreshToken);
     const digest = digestToken(refreshToken);
     // Raw-token fallback supports sessions issued before refresh tokens were hashed.
     const stored = await prisma.refreshToken.findFirst({
@@ -254,7 +377,14 @@ exports.refresh = async (req, res, next) => {
 
     // Rotate refresh token
     await prisma.$transaction(async (tx) => {
-      await tx.refreshToken.delete({ where: { id: stored.id } });
+      const claimed = await tx.refreshToken.deleteMany({
+        where: { id: stored.id, token: stored.token },
+      });
+      if (claimed.count !== 1) {
+        const error = new Error('Invalid or expired refresh token');
+        error.status = 401;
+        throw error;
+      }
       await storeRefreshToken(tx, decoded.userId, tokens.refreshToken);
     });
 
@@ -284,7 +414,7 @@ exports.logout = async (req, res, next) => {
 exports.requireTrustedOrigin = (req, res, next) => {
   const origin = req.headers.origin;
   if (!origin) return next();
-  const allowed = (process.env.FRONTEND_URL || 'http://localhost:3000').split(',').map((value) => value.trim());
+  const allowed = configuredFrontendOrigins();
   if (!allowed.includes(origin)) return res.status(403).json({ error: 'Origin not allowed' });
   next();
 };

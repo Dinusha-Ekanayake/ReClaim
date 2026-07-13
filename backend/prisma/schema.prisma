@@ -99,9 +99,12 @@ model User {
   reportedItems       Report[]             @relation("ReportedItemOwner")
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  pendingUploads      PendingUpload[]
 
   @@index([email])
   @@index([role])
+  @@index([createdAt])
 }
 
 model RefreshToken {
@@ -123,6 +126,17 @@ model PasswordResetToken {
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   @@index([userId, expiresAt])
 }
@@ -149,6 +163,8 @@ model Item {
   dateLostFound DateTime
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  contentRevision Int      @default(1)
+  deletedAt       DateTime?
 
   // Owner
   userId String
@@ -163,11 +179,19 @@ model Item {
   // Embedding for AI matching (stored as JSON array)
   embedding Json?
 
+  // Durable matching work state. Matching is asynchronous, but unlike an
+  // in-process promise this state survives deploys, crashes, and API restarts.
+  matchingPending   Boolean   @default(false)
+  matchingLockedAt  DateTime?
+  matchingRetryAt   DateTime?
+  matchingAttempts  Int       @default(0)
+  matchingLastError String?
+
   // Contact option
   showContactInfo Boolean @default(false)
 
   // Moderation
-  isApproved Boolean @default(true)
+  isApproved Boolean @default(false)
   adminNote  String?
 
   // Relations
@@ -176,10 +200,13 @@ model Item {
   matchesAsFound Match[]   @relation("FoundItem")
   claims         Claim[]
   reports        Report[]
+  chats          Chat[]
 
   @@index([type, status])
   @@index([isApproved, status, createdAt])
-  @@index([type, status, isApproved, category])
+  @@index([type, status, isApproved, category, createdAt])
+  @@index([matchingPending, isApproved, status, matchingRetryAt, createdAt])
+  @@index([deletedAt, isApproved, status, createdAt])
   @@index([userId, status, createdAt])
   @@index([userId])
   @@index([category])
@@ -189,13 +216,28 @@ model Item {
 model ItemImage {
   id        String   @id @default(uuid())
   url       String
-  publicId  String // Cloudinary public ID for deletion
+  publicId  String   @unique // Cloudinary public ID for deletion
   isPrimary Boolean  @default(false)
+  position  Int      @default(0)
   itemId    String
   item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
-  @@index([itemId])
+  @@index([itemId, position])
+}
+
+model PendingUpload {
+  id               String    @id @default(uuid())
+  userId           String?
+  user             User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  url              String?
+  publicId         String    @unique
+  expiresAt        DateTime
+  cleanupClaimedAt DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt, cleanupClaimedAt])
 }
 
 model Match {
@@ -204,6 +246,8 @@ model Match {
   foundItemId String
   score       Float // 0-100 matching score
   breakdown   Json // { category: 30, keywords: 25, location: 20, date: 15, image: 10 }
+  lostRank    Int? // ranking assigned when the lost report is processed
+  foundRank   Int? // ranking assigned when the found report is processed
   isNotified  Boolean  @default(false)
   createdAt   DateTime @default(now())
 
@@ -213,6 +257,8 @@ model Match {
   @@unique([lostItemId, foundItemId])
   @@index([lostItemId])
   @@index([foundItemId])
+  @@index([lostItemId, lostRank])
+  @@index([foundItemId, foundRank])
   @@index([score])
 }
 
@@ -243,11 +289,14 @@ model Claim {
 model Chat {
   id        String   @id @default(uuid())
   itemId    String? // context item (optional)
+  item      Item?   @relation(fields: [itemId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   participants ChatParticipant[]
   messages     Message[]
+
+  @@index([itemId])
 }
 
 model ChatParticipant {
@@ -299,6 +348,8 @@ model Comment {
 
   @@index([itemId])
   @@index([userId])
+  @@index([itemId, parentId, isHidden, createdAt])
+  @@index([parentId, isHidden, createdAt])
 }
 
 model Notification {
@@ -313,7 +364,7 @@ model Notification {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, isRead])
+  @@index([userId, isRead, createdAt])
   @@index([userId, createdAt])
   @@index([createdAt])
 }
@@ -338,7 +389,7 @@ model Report {
   @@unique([itemId, reporterId])
   @@index([itemId])
   @@index([reporterId])
-  @@index([status])
+  @@index([status, createdAt])
 }
 
 model ContactMessage {

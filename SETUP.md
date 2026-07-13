@@ -24,7 +24,7 @@
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Node.js | 18 LTS or 20 LTS | Runtime for both frontend and backend |
+| Node.js | 20.9+ (current LTS recommended) | Runtime for both frontend and backend; required by Next.js 16 |
 | npm | 9+ | Package manager |
 | Git | Latest | Version control |
 | A Supabase account | Free tier OK | PostgreSQL database |
@@ -69,8 +69,8 @@ cp frontend/.env.example frontend/.env.local
 
 ```bash
 cd backend
-npx prisma migrate deploy
 npx prisma generate
+npx prisma migrate deploy
 ```
 
 ### Seed the database (optional)
@@ -80,7 +80,9 @@ cd backend
 node prisma/seed.js
 ```
 
-This creates the configured admin account. Set a unique `ADMIN_PASSWORD` (12+ characters) first.
+This creates the explicitly configured admin account. Set `ADMIN_EMAIL`,
+`ADMIN_NAME`, and a unique 12–72 byte `ADMIN_PASSWORD` first. The repository
+does not publish working administrator credentials.
 Running the seed again rotates an existing configured admin to that password.
 
 ### Start development servers
@@ -119,31 +121,37 @@ Visit `http://localhost:3000` to see the app.
    postgresql://postgres:[YOUR-PASSWORD]@db.xxxxxxxxxxxx.supabase.co:5432/postgres
    ```
 
-> **Important:** Use port `5432` (direct connection), **not** port `6543` (transaction pooler).  
-> Prisma ORM does not work correctly with the transaction pooler for migrations.
+> **Important:** Configure two URLs. Use a pooled `DATABASE_URL` for runtime
+> queries and a migration-capable `DIRECT_URL` for Prisma DDL. On Render with
+> Supabase, `DIRECT_URL` can use the IPv4-compatible Supavisor **session** pooler
+> on port 5432; do not use the transaction pooler on port 6543 for migrations.
 
-### Set the DATABASE_URL
+### Set both database URLs
 
 ```env
-DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@db.YOUR_PROJECT_REF.supabase.co:5432/postgres"
+DATABASE_URL="postgresql://RUNTIME_POOLER/..."
+DIRECT_URL="postgresql://DIRECT_OR_SESSION_POOLER/..."
 ```
 
 ### Run migrations against production
 
 ```bash
 cd backend
-DATABASE_URL="postgresql://..." npx prisma migrate deploy
 npx prisma generate
+npx prisma migrate deploy
 ```
 
-### Preventing database pauses (free tier)
+The current release requires the complete committed chain, including
+`20260713150000_backend_hardening_indexes` and
+`20260713160000_durable_pending_uploads`. The latter creates the durable,
+single-use `PendingUpload` workflow and ordered item images. Do not start the
+updated backend unless migration deployment succeeds.
 
-Supabase free-tier projects pause after **7 days of inactivity**. To prevent this:
-- Upgrade to the Pro plan ($25/month), OR
-- Set up a free cron job at [cron-job.org](https://cron-job.org) to ping your API every 24 hours:
-  ```
-  GET https://your-api.onrender.com/health
-  ```
+### Provider inactivity policies
+
+Pricing and inactivity policies change; verify the current Supabase plan terms.
+A scheduled request is best effort and cannot guarantee that a provider will
+keep a project active. Use an appropriate paid plan when availability matters.
 
 ---
 
@@ -208,8 +216,8 @@ NODE_ENV=production
 PORT=5000
 
 # ── Database ─────────────────────────────────────────
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/postgres"
-DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/postgres"
+DATABASE_URL="postgresql://RUNTIME_POOLER/..."
+DIRECT_URL="postgresql://DIRECT_OR_SESSION_POOLER/..."
 
 # ── Authentication ────────────────────────────────────
 # Generate strong secrets: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
@@ -217,6 +225,11 @@ JWT_SECRET=CHANGE_THIS_TO_64_RANDOM_CHARS
 JWT_REFRESH_SECRET=CHANGE_THIS_TO_DIFFERENT_64_RANDOM_CHARS
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
+
+# ── Optional administrator seed (required only for an explicit seed run) ──
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=replace-with-a-unique-strong-password
+ADMIN_NAME=Your Name
 
 # ── Cloudinary ────────────────────────────────────────
 CLOUDINARY_CLOUD_NAME=your_cloud_name
@@ -236,7 +249,9 @@ FRONTEND_URL=https://your-app.vercel.app
 
 ```env
 # ── API ───────────────────────────────────────────────
+# Next.js server rewrite target; browser REST requests use same-origin /api.
 NEXT_PUBLIC_API_URL=https://your-api.onrender.com/api
+# Direct Socket.IO origin (no /api suffix).
 NEXT_PUBLIC_SOCKET_URL=https://your-api.onrender.com
 NEXT_PUBLIC_SITE_URL=https://your-app.vercel.app
 
@@ -256,7 +271,7 @@ NEXT_PUBLIC_SITE_URL=https://your-app.vercel.app
 2. Connect your GitHub repository
 3. Configure:
    - **Root Directory:** `backend`
-   - **Build Command:** `npm install && npx prisma generate`
+   - **Build Command:** `npm ci --include=dev && npx prisma generate && npx prisma migrate deploy`
    - **Start Command:** `npm start`
    - **Instance Type:** Free (or Starter for always-on)
    - **Runtime:** Node
@@ -265,11 +280,13 @@ NEXT_PUBLIC_SITE_URL=https://your-app.vercel.app
 
 In the Render dashboard → **Environment** tab, add all variables from [Section 6](#6-environment-variables-reference) for the backend.
 
-### Note on free tier
+### Plan availability behavior
 
-Render free services spin down after 15 minutes of inactivity. The first request after sleep takes ~30 seconds. To prevent this:
-- Upgrade to the **Starter plan** ($7/month), OR
-- Use [cron-job.org](https://cron-job.org) to ping `/health` every 10 minutes
+Verify Render's current plan terms and cold-start behavior. The optional
+`.github/workflows/keep-alive.yml` job creates best-effort request traffic only:
+scheduled jobs may be delayed or skipped, non-200 responses do not fail that
+workflow, and it neither provides outage alerts nor guarantees an always-on
+service. Use an always-on plan plus independent monitoring for an SLA.
 
 ### Custom domain (optional)
 
@@ -294,7 +311,7 @@ npx vercel --prod
 2. Set **Root Directory** to `frontend`
 3. Vercel auto-detects Next.js — no build command needed
 4. Add environment variables:
-   - `NEXT_PUBLIC_API_URL` → your Render backend URL with `/api`
+   - `NEXT_PUBLIC_API_URL` → your Render backend URL with `/api`; Next.js uses it as the server-side target for same-origin browser requests to `/api`
    - `NEXT_PUBLIC_SOCKET_URL` → your Render backend origin
    - `NEXT_PUBLIC_SITE_URL` → your canonical frontend origin
 
@@ -309,7 +326,7 @@ npx vercel --prod
 ## 9. Post-Deployment Checklist
 
 ```
-[ ] Set and securely store a unique `ADMIN_PASSWORD` before seeding
+[ ] Set private `ADMIN_EMAIL`, `ADMIN_NAME`, and a unique `ADMIN_PASSWORD` before seeding
 [ ] Set strong JWT_SECRET and JWT_REFRESH_SECRET (64+ random chars each)
 [ ] Verify database migrations ran successfully
 [ ] Test user registration and login
@@ -351,7 +368,9 @@ FRONTEND_URL=https://reclaim.vercel.app
 
 ### Rate limiting
 
-The backend uses `express-rate-limit`. Default: 100 requests per 15 minutes per IP. Adjust in `backend/src/index.js` if needed.
+The backend uses `express-rate-limit`. The global API limit is 200 requests per
+15 minutes per IP, with stricter authentication limits. Adjust these deliberately
+in `backend/src/app.js` if production traffic requires it.
 
 ### HTTPS
 
@@ -359,9 +378,8 @@ Both Vercel and Render provide free TLS certificates automatically. Do **not** s
 
 ### Database
 
-- Enable Row Level Security in Supabase for extra protection
 - Do not expose the `DATABASE_URL` publicly
-- Use the direct connection URL (port 5432), not the pooler
+- Use the pooled `DATABASE_URL` at runtime and the migration-capable `DIRECT_URL` only for Prisma tooling
 
 ### Content Security
 
@@ -376,10 +394,12 @@ Both Vercel and Render provide free TLS certificates automatically. Do **not** s
 ### Health check endpoint
 
 ```
-GET /health
+GET /api/health
 ```
 
-Returns `{ status: 'ok', uptime: ... }`. Use this for uptime monitoring.
+Returns process liveness. `GET /api/health/ready` also checks database
+connectivity. Configure a real monitor to fail and alert on non-success status;
+the bundled keep-alive workflow intentionally does neither.
 
 ### Database maintenance
 
@@ -428,4 +448,5 @@ npx prisma migrate deploy
 
 ---
 
-*For questions or issues, contact support@reclaim.app*
+For questions or issues, use the application's `/contact` form so the message is
+validated and stored in the administrator support inbox.

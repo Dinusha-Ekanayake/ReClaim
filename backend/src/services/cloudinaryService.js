@@ -31,11 +31,15 @@ const upload = multer({
 });
 
 // ─── Upload buffer to Cloudinary ──────────────────────────────────────────────
-async function uploadToCloudinary(buffer, folder = 'reclaim/items') {
+async function uploadToCloudinary(buffer, options = {}) {
+  const { folder = 'reclaim/items', publicId } = options;
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
       {
-        folder,
+        ...(publicId
+          ? { public_id: publicId, overwrite: false, unique_filename: false }
+          : { folder }),
+        resource_type: 'image',
         transformation: [
           { width: 1200, height: 1200, crop: 'limit' },
           { quality: 'auto', fetch_format: 'auto' },
@@ -52,9 +56,14 @@ async function uploadToCloudinary(buffer, folder = 'reclaim/items') {
 // ─── Delete from Cloudinary ───────────────────────────────────────────────────
 async function deleteFromCloudinary(publicId) {
   try {
-    await cloudinary.uploader.destroy(publicId);
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: 'image',
+      invalidate: true,
+    });
+    return ['ok', 'not found'].includes(result?.result);
   } catch (err) {
     console.error('Cloudinary delete error:', err);
+    return false;
   }
 }
 

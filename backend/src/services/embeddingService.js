@@ -3,7 +3,11 @@ let openai;
 function getOpenAI() {
   if (!openai && process.env.OPENAI_API_KEY) {
     const { OpenAI } = require('openai');
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      timeout: 10_000,
+      maxRetries: 1,
+    });
   }
   return openai;
 }

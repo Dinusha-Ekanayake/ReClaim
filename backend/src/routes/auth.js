@@ -47,6 +47,18 @@ router.post('/reset-password',
   authController.resetPassword
 );
 
+router.post('/verify-email',
+  [body('token').isHexadecimal().isLength({ min: 64, max: 64 }).withMessage('Invalid verification token')],
+  validate,
+  authController.verifyEmail
+);
+
+router.post('/resend-verification',
+  [body('email').isEmail().normalizeEmail().isLength({ max: 254 }).withMessage('Valid email required')],
+  validate,
+  authController.resendVerification
+);
+
 router.post('/refresh', authController.requireTrustedOrigin, authController.refresh);
 router.post('/logout', authController.requireTrustedOrigin, authController.logout);
 router.get('/me', authenticate, authController.me);

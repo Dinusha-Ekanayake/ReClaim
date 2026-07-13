@@ -16,7 +16,7 @@
 | **Role** | Full-stack Developer (design, frontend, backend, database, deployment) |
 | **Stack** | Next.js · React · TypeScript · Node.js · Express · PostgreSQL · Prisma · Socket.io |
 | **Highlights** | Weighted matching algorithm, AI semantic search, real-time chat, JWT auth with token rotation, full admin moderation suite |
-| **Status** | Deployed (Vercel + Render + Supabase) |
+| **Status** | Deployment configured for Vercel + Render + Supabase |
 
 ---
 
@@ -33,8 +33,9 @@ platform for Sri Lanka that could **automatically connect** a "lost" report with
 ReClaim is a platform where users post lost or found items, and the system intelligently
 matches them using a multi-factor scoring algorithm. When a strong match is detected, both
 parties are notified instantly and can chat in real time. Before a found item changes hands,
-the finder sets **hidden verification questions** that only the genuine owner could answer —
-preventing fraudulent claims. Admins moderate the whole flow.
+the finder publishes **ownership questions** that only the genuine owner should be able to
+answer. Claimants can see the questions, while their submitted answers remain private to the
+finder and administrators for review. Admins moderate the whole flow.
 
 ---
 
@@ -48,9 +49,9 @@ preventing fraudulent claims. Admins moderate the whole flow.
   `text-embedding-3-small` model and compared by cosine similarity, catching matches that
   keyword search alone would miss. Degrades gracefully to a zero-weight factor when no API key
   is present.
-- **Fraud-resistant claim verification** — Finders attach hidden verification hints to a found
-  item; claimants must answer them. Hints are stripped from every public API response so only
-  the true owner can pass.
+- **Fraud-resistant claim verification** — Finders attach public ownership questions to a found
+  item; claimants must answer all of them. Submitted answers are private to the finder and
+  administrators, while legacy unprefixed hints remain excluded from public responses.
 - **Real-time chat & notifications** — Socket.io powers instant messaging (with typing
   indicators and read receipts) and live push notifications for matches, claims, messages, and
   status changes.
@@ -84,9 +85,9 @@ preventing fraudulent claims. Admins moderate the whole flow.
 - **Backend** — Layered Express API (routes → controllers → services), a singleton Prisma
   client to prevent connection-pool exhaustion, centralized error handling, request validation,
   rate limiting, and Helmet security headers.
-- **Database** — PostgreSQL with a normalized 13-model Prisma schema (users, items, images,
-  matches, claims, chats, messages, comments, notifications, reports, refresh tokens) and
-  indexed lookups.
+- **Database** — PostgreSQL with a normalized Prisma schema covering users, sessions, items,
+  ordered images, pending uploads, matches, claims, chats, messages, comments, notifications,
+  reports, password resets, and contact messages, with indexes aligned to production queries.
 - **Real-time** — A Socket.io server sharing the same JWT auth; users auto-join a private room
   for targeted notifications.
 
@@ -102,7 +103,7 @@ full scoring for performance.
 | Category | 25 | Exact match |
 | Keywords | 25 | Jaccard similarity on title + description |
 | Location | 20 | Haversine distance (GPS) with label-similarity fallback |
-| Date | 15 | Exponential decay over a 30-day window |
+| Date | 15 | Fixed proximity buckets through a 30-day window |
 | Color + brand | 10 | Per-attribute exact match |
 | AI embedding | 5 | Cosine similarity of OpenAI embeddings |
 
@@ -135,8 +136,8 @@ These are the points worth talking through in an interview:
 - **Designed a weighted, multi-factor matching algorithm** that combines structured signals
   (category, location, dates) with unstructured AI embeddings — and made the AI an *optional*
   enhancement so the system never hard-depends on a third-party API.
-- **Built a fraud-resistant verification flow** by treating verification hints as a security
-  boundary: stripped from every public response and answerable only by the legitimate owner.
+- **Built a fraud-resistant verification flow** with public ownership questions and private,
+  question-snapshotted claimant answers available only to the finder and administrators.
 - **Implemented production-grade auth** with short-lived access tokens, rotating refresh tokens,
   and silent client-side refresh — balancing security with a seamless user experience.
 - **Engineered for resilience and performance** — async match computation that doesn't block
@@ -155,7 +156,7 @@ These are the points worth talking through in an interview:
 
 > Built **ReClaim**, a full-stack Lost & Found platform (Next.js, Node/Express, PostgreSQL)
 > featuring a weighted AI-assisted matching algorithm, real-time chat via Socket.io, and a
-> fraud-resistant claim-verification flow; deployed on Vercel, Render, and Supabase.
+> fraud-resistant claim-verification flow; configured for Vercel, Render, and Supabase.
 
 **Two–three bullets (project section):**
 
@@ -166,18 +167,18 @@ These are the points worth talking through in an interview:
 > - Engineered a fraud-resistant claim-verification flow and JWT authentication with rotating
 >   refresh tokens and transparent client-side refresh.
 > - Built real-time chat and push notifications with Socket.io and a full admin moderation
->   suite; deployed across Vercel, Render, and Supabase.
+>   suite; prepared for deployment across Vercel, Render, and Supabase.
 
 **LinkedIn / portfolio summary (1 paragraph):**
 
 > ReClaim is a smart Lost & Found platform that reunites people with their missing belongings.
 > Users post lost or found items, and a weighted matching algorithm — combining category,
 > keywords, GPS location, dates, item attributes, and AI semantic embeddings — automatically
-> surfaces likely matches and notifies both parties in real time. A hidden verification-question
-> system prevents fraudulent claims before items change hands. I built the entire stack:
+> surfaces likely matches and notifies both parties in real time. A public ownership-question
+> and private-answer review flow helps prevent fraudulent claims before items change hands. I built the entire stack:
 > a Next.js/TypeScript frontend, a Node.js/Express API with a PostgreSQL/Prisma database,
-> real-time chat and notifications via Socket.io, and a full admin moderation panel, deployed
-> on Vercel, Render, and Supabase.
+> real-time chat and notifications via Socket.io, and a full admin moderation panel, with
+> deployment configuration for Vercel, Render, and Supabase.
 
 **Skills demonstrated:** Full-stack development · REST API design · Real-time systems (WebSockets) ·
 Relational data modeling · Authentication & security · Algorithm design · AI/LLM integration ·

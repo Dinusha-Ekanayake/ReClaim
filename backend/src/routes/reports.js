@@ -11,7 +11,7 @@ const VALID_REASONS = ['FAKE', 'INAPPROPRIATE', 'SPAM', 'WRONG_CATEGORY', 'OTHER
 router.post('/',
   authenticate,
   [
-    body('itemId').notEmpty(),
+    body('itemId').isUUID().withMessage('Valid item id required'),
     body('reason').isIn(VALID_REASONS),
     body('description').optional().isLength({ max: 500 }),
   ],

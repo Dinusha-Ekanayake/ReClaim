@@ -1,7 +1,8 @@
 # Render Blueprint — ReClaim backend (Express + Socket.io).
-# Free web services run indefinitely (they only sleep after ~15 min idle; the
-# keep-alive cron in .github/workflows keeps it warm). This is NOT a free
-# database — the DB stays on Supabase.
+# Provider plan availability and cold-start behavior can change. The optional
+# job in .github/workflows sends best-effort request traffic only; it is not an
+# uptime guarantee or alerting monitor. The database is hosted separately on
+# Supabase.
 #
 # Deploy: push to GitHub, then on render.com → New → Blueprint → pick this repo.
 services:
@@ -12,7 +13,7 @@ services:
     rootDir: backend
     # Generate the client and apply committed, forward-only migrations before
     # the new application version starts serving requests.
-    buildCommand: npm ci && npx prisma generate && npx prisma migrate deploy
+    buildCommand: npm ci --include=dev && npx prisma generate && npx prisma migrate deploy
     startCommand: npm start
     healthCheckPath: /api/health/ready
     autoDeploy: true
@@ -23,11 +24,20 @@ services:
       # never overwrites secret values you enter there).
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_CONNECTION_LIMIT
+        value: 5
+      - key: DATABASE_POOL_TIMEOUT_SECONDS
+        value: 30
       - key: DIRECT_URL
         sync: false
+        # Supabase + Render: use the IPv4-compatible Supavisor session pooler
+        # endpoint on port 5432. The db.<project>.supabase.co direct endpoint is
+        # IPv6-only unless the Supabase IPv4 add-on is enabled.
       - key: JWT_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: UPLOAD_RECEIPT_SECRET
         sync: false
       - key: JWT_EXPIRES_IN
         value: 15m
@@ -41,6 +51,10 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: MATCHING_WORKER_INTERVAL_MS
+        value: 15000
+      - key: MATCHING_WORKER_BATCH_SIZE
+        value: 10
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM

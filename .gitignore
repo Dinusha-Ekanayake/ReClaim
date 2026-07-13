@@ -6,8 +6,8 @@ dist/
 build/
 .next/
 *.log
+*.tsbuildinfo
 .DS_Store
 Thumbs.db
 .vercel
-prisma/migrations/
 CLAUDE.md

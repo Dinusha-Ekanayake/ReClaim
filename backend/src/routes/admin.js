@@ -2,10 +2,17 @@ const express = require('express');
 const router = express.Router();
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
-const { createNotification } = require('../services/notificationService');
-const { body, query } = require('express-validator');
+const { emitNotification } = require('../services/notificationService');
+const { reviewClaim } = require('../services/claimReviewService');
+const { body, param, query } = require('express-validator');
 const { validate } = require('../middleware/validate');
 const { getPagination, paginationResult } = require('../utils/query');
+const {
+  cleanupPendingUploads,
+  queueAssetsForCleanup,
+} = require('../services/pendingUploadService');
+
+const idValidator = () => param('id').isUUID().withMessage('Valid record id required');
 
 // All admin routes require authentication + admin role
 router.use(authenticate, requireAdmin);
@@ -16,11 +23,11 @@ router.get('/stats', async (req, res, next) => {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const [userRoles, itemGroups, reportGroups, claimGroups, recentUsers, recentItems] = await Promise.all([
       prisma.user.groupBy({ by: ['role'], _count: { _all: true } }),
-      prisma.item.groupBy({ by: ['type', 'status'], _count: { _all: true } }),
+      prisma.item.groupBy({ by: ['type', 'status'], where: { deletedAt: null }, _count: { _all: true } }),
       prisma.report.groupBy({ by: ['status'], _count: { _all: true } }),
       prisma.claim.groupBy({ by: ['status'], _count: { _all: true } }),
       prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
-      prisma.item.count({ where: { createdAt: { gte: weekAgo } } }),
+      prisma.item.count({ where: { deletedAt: null, createdAt: { gte: weekAgo } } }),
     ]);
 
     const sum = (rows, predicate = () => true) => rows
@@ -59,7 +66,8 @@ router.get('/stats', async (req, res, next) => {
 router.get('/users', [
   query('role').optional().isIn(['USER', 'ADMIN', 'SUPER_ADMIN']),
   query('banned').optional().isBoolean(),
-  query('page').optional().isInt({ min: 1 }),
+  query('search').optional().trim().isLength({ max: 120 }),
+  query('page').optional().isInt({ min: 1, max: 1000 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
 ], validate, async (req, res, next) => {
   try {
@@ -100,6 +108,7 @@ router.get('/users', [
 });
 
 router.patch('/users/:id/ban', [
+  idValidator(),
   body('isBanned').isBoolean(),
   body('banReason').optional({ nullable: true }).trim().isLength({ max: 500 }),
   body('banReason').custom((value, { req }) => {
@@ -117,18 +126,62 @@ router.patch('/users/:id/ban', [
     if (target.role === 'SUPER_ADMIN') return res.status(403).json({ error: 'Cannot ban super admin' });
     if (target.role === 'ADMIN' && req.user.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Super admin required' });
 
-    const updated = await prisma.user.update({
-      where: { id },
-      data: { isBanned, banReason: isBanned ? banReason : null },
-      select: { id: true, name: true, isBanned: true, banReason: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id },
+        data: { isBanned, banReason: isBanned ? banReason : null },
+        select: { id: true, name: true, isBanned: true, banReason: true },
+      });
+      if (isBanned) {
+        await tx.refreshToken.deleteMany({ where: { userId: id } });
+        const quarantined = await tx.item.updateMany({
+          where: {
+            userId: id,
+            isApproved: true,
+            status: { in: ['ACTIVE', 'MATCHED', 'CLAIM_PENDING'] },
+          },
+          data: {
+            isApproved: false,
+            matchingPending: false,
+            matchingLockedAt: null,
+            matchingRetryAt: null,
+            matchingAttempts: 0,
+            matchingLastError: null,
+          },
+        });
+        const removedMatches = await tx.match.deleteMany({
+          where: {
+            OR: [
+              { lostItem: { userId: id } },
+              { foundItem: { userId: id } },
+            ],
+          },
+        });
+        return {
+          ...user,
+          quarantinedItems: quarantined.count,
+          removedMatches: removedMatches.count,
+        };
+      }
+      return user;
     });
+    if (isBanned) {
+      try {
+        const { getIO } = require('../socket');
+        const io = getIO();
+        io.to(`user:${id}`).emit('account:disabled', { message: 'This account has been disabled.' });
+        io.in(`user:${id}`).disconnectSockets(true);
+      } catch {
+        // HTTP-only tests and startup windows may not have a Socket.IO server.
+      }
+    }
     res.json(updated);
   } catch (err) {
     next(err);
   }
 });
 
-router.patch('/users/:id/role', async (req, res, next) => {
+router.patch('/users/:id/role', [idValidator()], validate, async (req, res, next) => {
   try {
     if (req.user.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Super admin only' });
     const { role } = req.body;
@@ -151,7 +204,8 @@ router.get('/items', [
   query('type').optional().isIn(['LOST', 'FOUND']),
   query('status').optional().isIn(['ACTIVE', 'MATCHED', 'CLAIM_PENDING', 'RETURNED', 'CLOSED', 'REJECTED']),
   query('approved').optional().isBoolean(),
-  query('page').optional().isInt({ min: 1 }),
+  query('search').optional().trim().isLength({ max: 120 }),
+  query('page').optional().isInt({ min: 1, max: 1000 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
 ], validate, async (req, res, next) => {
   try {
@@ -159,6 +213,7 @@ router.get('/items', [
     const pagination = getPagination({ page, limit }, { defaultLimit: 20, maxLimit: 100 });
 
     const where = {
+      deletedAt: null,
       ...(type && { type }),
       ...(status && { status }),
       ...(approved !== undefined && { isApproved: approved === 'true' }),
@@ -191,18 +246,69 @@ router.get('/items', [
 });
 
 router.patch('/items/:id/approve', [
+  idValidator(),
   body('isApproved').isBoolean(),
+  body('contentRevision').isInt({ min: 1 }).withMessage('Reviewed content revision is required'),
   body('adminNote').optional({ nullable: true }).trim().isLength({ max: 500 }),
 ], validate, async (req, res, next) => {
   try {
-    const { isApproved, adminNote } = req.body;
-    const updated = await prisma.item.update({
-      where: { id: req.params.id },
-      data: {
-        isApproved,
-        adminNote,
-        status: isApproved ? 'ACTIVE' : 'REJECTED',
-      },
+    const { isApproved, adminNote, contentRevision } = req.body;
+    const updated = await prisma.$transaction(async (tx) => {
+      const existing = await tx.item.findUnique({
+        where: { id: req.params.id },
+        select: { status: true, contentRevision: true, deletedAt: true },
+      });
+      if (!existing) {
+        const error = new Error('Item not found');
+        error.status = 404;
+        throw error;
+      }
+      if (existing.deletedAt) {
+        const error = new Error('Deleted items cannot be approved');
+        error.status = 409;
+        throw error;
+      }
+      if (existing.contentRevision !== Number(contentRevision)) {
+        const error = new Error('This report changed after it was reviewed. Reload it before moderating.');
+        error.status = 409;
+        throw error;
+      }
+
+      const terminalLifecycle = ['RETURNED', 'CLOSED'].includes(existing.status);
+      const nextStatus = terminalLifecycle ? existing.status : (isApproved ? 'ACTIVE' : 'REJECTED');
+
+      // Moderation and matching visibility change together. Removing old rows
+      // prevents stale suggestions from surviving a rejection or re-approval.
+      await tx.match.deleteMany({
+        where: { OR: [{ lostItemId: req.params.id }, { foundItemId: req.params.id }] },
+      });
+
+      const approved = await tx.item.updateMany({
+        where: {
+          id: req.params.id,
+          contentRevision: Number(contentRevision),
+          status: existing.status,
+          deletedAt: null,
+        },
+        data: {
+          isApproved,
+          adminNote,
+          // Moderation must not reopen a completed lifecycle. isApproved alone
+          // hides terminal items while they are under review.
+          status: nextStatus,
+          matchingPending: isApproved && !terminalLifecycle,
+          matchingLockedAt: null,
+          matchingRetryAt: null,
+          matchingAttempts: 0,
+          matchingLastError: null,
+        },
+      });
+      if (approved.count !== 1) {
+        const error = new Error('This report changed after it was reviewed. Reload it before moderating.');
+        error.status = 409;
+        throw error;
+      }
+      return tx.item.findUnique({ where: { id: req.params.id } });
     });
     res.json(updated);
   } catch (err) {
@@ -210,13 +316,51 @@ router.patch('/items/:id/approve', [
   }
 });
 
-router.delete('/items/:id', async (req, res, next) => {
+router.delete('/items/:id', [idValidator()], validate, async (req, res, next) => {
   try {
-    const item = await prisma.item.findUnique({ where: { id: req.params.id }, select: { images: { select: { publicId: true } } } });
-    if (!item) return res.status(404).json({ error: 'Item not found' });
-    await prisma.item.delete({ where: { id: req.params.id } });
-    const { deleteFromCloudinary } = require('../services/cloudinaryService');
-    await Promise.all(item.images.filter((image) => image.publicId).map((image) => deleteFromCloudinary(image.publicId)));
+    const item = await prisma.item.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        userId: true,
+        contentRevision: true,
+        deletedAt: true,
+        images: { select: { url: true, publicId: true } },
+      },
+    });
+    if (!item || item.deletedAt) return res.status(404).json({ error: 'Item not found' });
+
+    let cleanupIds = [];
+    await prisma.$transaction(async (tx) => {
+      const removed = await tx.item.updateMany({
+        where: { id: item.id, deletedAt: null, contentRevision: item.contentRevision },
+        data: {
+          deletedAt: new Date(),
+          isApproved: false,
+          contentRevision: { increment: 1 },
+          matchingPending: false,
+          matchingLockedAt: null,
+          matchingRetryAt: null,
+          matchingAttempts: 0,
+          matchingLastError: null,
+        },
+      });
+      if (removed.count !== 1) {
+        const error = new Error('This report changed. Reload it before deleting.');
+        error.status = 409;
+        throw error;
+      }
+      cleanupIds = await queueAssetsForCleanup(tx, item.userId, item.images);
+      await Promise.all([
+        tx.itemImage.deleteMany({ where: { itemId: item.id } }),
+        tx.chat.deleteMany({ where: { itemId: item.id } }),
+        tx.match.deleteMany({ where: { OR: [{ lostItemId: item.id }, { foundItemId: item.id }] } }),
+      ]);
+    });
+    if (cleanupIds.length) {
+      void cleanupPendingUploads({ ids: cleanupIds, limit: cleanupIds.length })
+        .catch(error => console.error('Failed to remove moderated item assets:', error));
+    }
     res.json({ message: 'Item deleted' });
   } catch (err) {
     next(err);
@@ -226,7 +370,7 @@ router.delete('/items/:id', async (req, res, next) => {
 // ─── Claims ───────────────────────────────────────────────────────────────────
 router.get('/claims', [
   query('status').optional().isIn(['PENDING', 'APPROVED', 'REJECTED']),
-  query('page').optional().isInt({ min: 1 }),
+  query('page').optional().isInt({ min: 1, max: 1000 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
 ], validate, async (req, res, next) => {
   try {
@@ -259,6 +403,7 @@ router.get('/claims', [
 });
 
 router.patch('/claims/:id', [
+  idValidator(),
   body('status').isIn(['APPROVED', 'REJECTED']),
   body('adminNote').optional({ nullable: true }).trim().isLength({ max: 500 }),
 ], validate, async (req, res, next) => {
@@ -268,65 +413,17 @@ router.patch('/claims/:id', [
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    const claim = await prisma.claim.findUnique({
-      where: { id: req.params.id },
-      include: { item: { select: { id: true, title: true } } },
-    });
-    if (!claim) return res.status(404).json({ error: 'Claim not found' });
-    if (claim.status !== 'PENDING') return res.status(409).json({ error: 'Claim has already been reviewed' });
-    const displacedClaims = status === 'APPROVED'
-      ? await prisma.claim.findMany({
-          where: { itemId: claim.itemId, id: { not: req.params.id }, status: 'PENDING' },
-          select: { claimantId: true },
-        })
-      : [];
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const result = await tx.claim.updateMany({
-        where: { id: req.params.id, status: 'PENDING' },
-        data: { status, adminNote, reviewedAt: new Date(), reviewedBy: req.user.id },
-      });
-      if (result.count !== 1) {
-        const error = new Error('Claim has already been reviewed');
-        error.status = 409;
-        throw error;
-      }
-      if (status === 'APPROVED') {
-        await tx.claim.updateMany({
-          where: { itemId: claim.itemId, id: { not: req.params.id }, status: 'PENDING' },
-          data: { status: 'REJECTED', adminNote: 'Another claim was approved', reviewedAt: new Date(), reviewedBy: req.user.id },
-        });
-        await tx.item.update({ where: { id: claim.itemId }, data: { status: 'RETURNED' } });
-      } else {
-        const pending = await tx.claim.count({ where: { itemId: claim.itemId, status: 'PENDING' } });
-        await tx.item.update({ where: { id: claim.itemId }, data: { status: pending > 0 ? 'CLAIM_PENDING' : 'ACTIVE' } });
-      }
-      return tx.claim.findUnique({
-        where: { id: req.params.id }, select: { id: true, status: true, adminNote: true },
-      });
+    const result = await reviewClaim({
+      claimId: req.params.id,
+      status,
+      adminNote,
+      reviewerId: req.user.id,
+      reviewerRole: req.user.role,
+      adminReview: true,
     });
 
-    if (status === 'APPROVED') {
-      await createNotification(
-        claim.claimantId, 'CLAIM_APPROVED',
-        'Your claim was approved!',
-        `Your claim for "${claim.item.title}" has been approved by an admin.`,
-        `/items/${claim.itemId}`
-      );
-      await Promise.all(displacedClaims.map((other) => createNotification(
-        other.claimantId, 'CLAIM_REJECTED', 'Claim not approved',
-        `Another claim for "${claim.item.title}" was approved.`, `/items/${claim.itemId}`
-      )));
-    } else {
-      await createNotification(
-        claim.claimantId, 'CLAIM_REJECTED',
-        'Claim not approved',
-        `Your claim for "${claim.item.title}" was not approved.`,
-        `/items/${claim.itemId}`
-      );
-    }
-
-    res.json(updated);
+    result.notifications.forEach(emitNotification);
+    res.json(result.claim);
   } catch (err) {
     next(err);
   }
@@ -335,7 +432,7 @@ router.patch('/claims/:id', [
 // ─── Reports ──────────────────────────────────────────────────────────────────
 router.get('/reports', [
   query('status').optional().isIn(['PENDING', 'REVIEWED', 'RESOLVED', 'DISMISSED']),
-  query('page').optional().isInt({ min: 1 }),
+  query('page').optional().isInt({ min: 1, max: 1000 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
 ], validate, async (req, res, next) => {
   try {
@@ -364,14 +461,21 @@ router.get('/reports', [
 });
 
 router.patch('/reports/:id', [
+  idValidator(),
   body('status').isIn(['REVIEWED', 'RESOLVED', 'DISMISSED']),
   body('adminNote').optional({ nullable: true }).trim().isLength({ max: 500 }),
 ], validate, async (req, res, next) => {
   try {
     const { status, adminNote } = req.body;
+    const isTerminal = ['RESOLVED', 'DISMISSED'].includes(status);
     const updated = await prisma.report.update({
       where: { id: req.params.id },
-      data: { status, adminNote, resolvedAt: new Date(), resolvedBy: req.user.id },
+      data: {
+        status,
+        adminNote,
+        resolvedAt: isTerminal ? new Date() : null,
+        resolvedBy: isTerminal ? req.user.id : null,
+      },
     });
     res.json(updated);
   } catch (err) {
@@ -382,7 +486,7 @@ router.patch('/reports/:id', [
 // Contact inbox
 router.get('/contacts', [
   query('status').optional().isIn(['NEW', 'IN_PROGRESS', 'RESOLVED', 'SPAM']),
-  query('page').optional().isInt({ min: 1 }),
+  query('page').optional().isInt({ min: 1, max: 1000 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('search').optional().trim().isLength({ max: 120 }),
 ], validate, async (req, res, next) => {
@@ -415,6 +519,7 @@ router.get('/contacts', [
 });
 
 router.patch('/contacts/:id', [
+  idValidator(),
   body('status').isIn(['NEW', 'IN_PROGRESS', 'RESOLVED', 'SPAM']),
   body('adminNote').optional({ nullable: true }).trim().isLength({ max: 1000 }),
 ], validate, async (req, res, next) => {

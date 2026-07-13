@@ -1,5 +1,6 @@
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
+const MAX_PAGE = 1000;
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -9,7 +10,8 @@ function parsePositiveInt(value, fallback) {
 function getPagination(query, options = {}) {
   const defaultLimit = options.defaultLimit ?? DEFAULT_LIMIT;
   const maxLimit = options.maxLimit ?? MAX_LIMIT;
-  const page = parsePositiveInt(query.page, 1);
+  const maxPage = options.maxPage ?? MAX_PAGE;
+  const page = Math.min(parsePositiveInt(query.page, 1), maxPage);
   const limit = Math.min(parsePositiveInt(query.limit, defaultLimit), maxLimit);
   return { page, limit, skip: (page - 1) * limit };
 }

@@ -21,9 +21,6 @@ const publicItemSelect = {
   brand: true,
   color: true,
   size: true,
-  locationLabel: true,
-  locationLat: true,
-  locationLng: true,
   locationArea: true,
   dateLostFound: true,
   showContactInfo: true,
@@ -33,4 +30,24 @@ const publicItemSelect = {
   userId: true,
 };
 
-module.exports = { publicUserSelect, primaryImageSelect, publicItemSelect };
+const ownerItemSelect = {
+  ...publicItemSelect,
+  locationLabel: true,
+  locationLat: true,
+  locationLng: true,
+};
+
+function withPublicLocation(item) {
+  return {
+    ...item,
+    locationLabel: item.locationArea || 'Location shared privately',
+  };
+}
+
+module.exports = {
+  publicUserSelect,
+  primaryImageSelect,
+  publicItemSelect,
+  ownerItemSelect,
+  withPublicLocation,
+};

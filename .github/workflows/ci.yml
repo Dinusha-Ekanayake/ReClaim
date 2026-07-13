@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_PUBLIC_API_URL: https://api.example.invalid/api
+      NEXT_PUBLIC_SOCKET_URL: https://socket.example.invalid
+      NEXT_PUBLIC_SITE_URL: https://app.example.invalid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.9.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm exec -- tsc --noEmit --pretty false --incremental false
+      - run: npm run build
+
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: reclaim
+          POSTGRES_PASSWORD: reclaim
+          POSTGRES_DB: reclaim_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U reclaim -d reclaim_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://reclaim:reclaim@127.0.0.1:5432/reclaim_test
+      DIRECT_URL: postgresql://reclaim:reclaim@127.0.0.1:5432/reclaim_test
+      TEST_DATABASE_URL: postgresql://reclaim:reclaim@127.0.0.1:5432/reclaim_test
+      JWT_SECRET: ci-only-access-secret-at-least-32-characters
+      JWT_REFRESH_SECRET: ci-only-refresh-secret-at-least-32-characters
+      UPLOAD_RECEIPT_SECRET: ci-only-upload-secret-at-least-32-characters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.9.0
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm exec -- prisma generate
+      - run: npm exec -- prisma validate
+      - run: npm exec -- prisma migrate deploy
+      - run: npm test

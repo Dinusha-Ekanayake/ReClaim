@@ -5,6 +5,7 @@ const REQUIRED = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
 const PRODUCTION_REQUIRED = [
   'DIRECT_URL',
   'FRONTEND_URL',
+  'UPLOAD_RECEIPT_SECRET',
   'CLOUDINARY_CLOUD_NAME',
   'CLOUDINARY_API_KEY',
   'CLOUDINARY_API_SECRET',
@@ -17,8 +18,9 @@ const OPTIONAL_FEATURES = {
   CLOUDINARY_CLOUD_NAME: 'image uploads',
   CLOUDINARY_API_KEY: 'image uploads',
   CLOUDINARY_API_SECRET: 'image uploads',
-  RESEND_API_KEY: 'password-reset email delivery',
+  RESEND_API_KEY: 'email verification and password-reset delivery',
 };
+const { parseFrontendOrigins } = require('./origins');
 
 function fail(message) {
   console.error(`\nConfiguration error: ${message}\n`);
@@ -34,7 +36,7 @@ function validateEnv() {
   }
 
   if (isProduction) {
-    for (const key of ['JWT_SECRET', 'JWT_REFRESH_SECRET']) {
+    for (const key of ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'UPLOAD_RECEIPT_SECRET']) {
       const value = process.env[key];
       if (value.length < 32 || /(replace|change|example|password)/i.test(value)) {
         fail(`${key} must be a non-placeholder random value of at least 32 characters.`);
@@ -43,18 +45,18 @@ function validateEnv() {
     if (process.env.JWT_SECRET === process.env.JWT_REFRESH_SECRET) {
       fail('JWT_SECRET and JWT_REFRESH_SECRET must be different.');
     }
+    if (new Set([
+      process.env.JWT_SECRET,
+      process.env.JWT_REFRESH_SECRET,
+      process.env.UPLOAD_RECEIPT_SECRET,
+    ]).size !== 3) {
+      fail('JWT_SECRET, JWT_REFRESH_SECRET, and UPLOAD_RECEIPT_SECRET must all be different.');
+    }
 
-    const frontendOrigins = process.env.FRONTEND_URL.split(',').map(value => value.trim());
-    const hasInvalidOrigin = frontendOrigins.some(value => {
-      try {
-        const url = new URL(value);
-        return url.protocol !== 'https:' || url.pathname !== '/' || Boolean(url.search || url.hash);
-      } catch {
-        return true;
-      }
-    });
-    if (hasInvalidOrigin) {
-      fail('FRONTEND_URL must contain only comma-separated HTTPS origins without paths.');
+    try {
+      process.env.FRONTEND_URL = parseFrontendOrigins(process.env.FRONTEND_URL, { requireHttps: true }).join(',');
+    } catch (error) {
+      fail(`${error.message}. Use comma-separated HTTPS origins without paths or credentials.`);
     }
 
     for (const key of ['DATABASE_URL', 'DIRECT_URL']) {

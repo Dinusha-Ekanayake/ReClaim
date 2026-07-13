@@ -48,12 +48,15 @@ items
   ├── title, description, category, brand, color
   ├── locationLabel, locationLat, locationLng
   ├── dateLostFound
-  ├── verificationHints[] ← hidden from public
+  ├── verificationHints[] ← legacy storage; question:-prefixed values project publicly
   ├── embedding (JSON vector for AI matching)
   └── userId → users
 
 item_images
-  └── url, publicId (Cloudinary), isPrimary, itemId
+  └── url, unique publicId (Cloudinary), position, isPrimary, itemId
+
+pending_uploads
+  └── userId, url, unique publicId, expiresAt, cleanupClaimedAt
 
 matches
   ├── lostItemId, foundItemId
@@ -65,7 +68,7 @@ chats + chat_participants + messages
 
 claims
   ├── itemId, claimantId
-  ├── verificationAnswers (JSON)
+  ├── verificationAnswers (private question-text → answer JSON snapshot)
   ├── status: PENDING | APPROVED | REJECTED
   └── message
 
@@ -91,19 +94,31 @@ Match Score (0-100) =
   AI embedding cosine    × 5
 
 Thresholds:
-  ≥ 70 → "Strong match"  — immediate notification sent
-  ≥ 50 → "Good match"
-  ≥ 30 → "Possible match"
+  ≥ 60 → high-confidence match — notification sent once
+  ≥ 30 → stored possible match
   < 30 → not stored
 ```
+
+Date closeness is bucketed by absolute day difference: same day, ≤1, ≤3, ≤7,
+≤14, and ≤30 days. Public item detail exposes only safe ownership questions
+stored with the `question:` prefix. Claim answers are snapshotted privately for
+the finder/admin review flow.
+
+Item uploads use durable, one-hour `PendingUpload` ownership records. A signed,
+user-bound receipt is consumed atomically when the asset is attached, preventing
+receipt replay and preventing abandoned-upload cleanup from deleting an attached
+image.
 
 ## Auth Flow
 
 ```
 Register/Login → JWT access token (15min) + refresh token (7d)
-                 HttpOnly cookies; refresh-token digest stored in PostgreSQL
+                 HttpOnly SameSite=Lax cookies; refresh-token digest stored in PostgreSQL
 
-Every web request → credentialed cookie auth (Bearer tokens remain supported for API clients)
+Browser REST request → frontend-origin /api → Next.js server rewrite → backend
+                       first-party cookies + in-memory Bearer access token
+
+Non-browser API request → backend origin directly with supported Bearer token
 
 On 401 TOKEN_EXPIRED → credentialed auto-refresh using the HttpOnly cookie
                         rotate refresh token (single-use)

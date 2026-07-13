@@ -1,13 +1,15 @@
-name: Keep backend warm
+name: Scheduled backend ping
 
-# Pings the Render backend's health endpoint so the free web service doesn't
-# sleep after 15 min idle, and so Supabase doesn't pause from inactivity.
+# Sends best-effort traffic to the backend health endpoint. Hosted cron timing
+# is not guaranteed, this endpoint does not query the database, and the job is
+# intentionally non-alerting; it cannot promise an always-on service or prevent
+# a database provider from pausing a project.
 #
 # Setup: add a repo variable named BACKEND_URL (Settings → Secrets and variables
 # → Actions → Variables) = your Render URL, e.g. https://reclaim-api.onrender.com
 #
 # Note: GitHub may skip scheduled runs on inactive repos and cron timing is
-# best-effort, but for a portfolio app a wake every ~14 min is plenty.
+# best-effort. Use an always-on plan and a real monitor when availability matters.
 
 on:
   schedule:
@@ -28,10 +30,10 @@ jobs:
           echo "Pinging $URL/api/health"
           code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$URL/api/health" || echo "000")
           echo "HTTP $code"
-          # Don't fail the workflow on a cold-start timeout; the request still
-          # wakes the service, which is the whole point.
+          # This traffic helper deliberately does not fail on a timeout or
+          # non-200 response. It is not an outage monitor or alerting check.
           if [ "$code" = "200" ]; then
-            echo "Backend is awake."
+            echo "Backend returned 200."
           else
-            echo "Got $code (likely waking from cold start) — that's fine."
+            echo "Got $code; use independent monitoring to investigate failures."
           fi

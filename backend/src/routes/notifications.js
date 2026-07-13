@@ -1,11 +1,17 @@
 const express = require('express');
 const router = express.Router();
+const { param, query } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
 const prisma = require('../lib/prisma');
 const { getPagination, paginationResult } = require('../utils/query');
 
 // GET /api/notifications
-router.get('/', authenticate, async (req, res, next) => {
+router.get('/', authenticate, [
+  query('unread').optional().isBoolean(),
+  query('page').optional().isInt({ min: 1, max: 1000 }),
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+], validate, async (req, res, next) => {
   try {
     const { unread } = req.query;
     const pagination = getPagination(req.query, { defaultLimit: 20, maxLimit: 100 });
@@ -46,9 +52,11 @@ router.patch('/read-all', authenticate, async (req, res, next) => {
 });
 
 // PATCH /api/notifications/:id/read
-router.patch('/:id/read', authenticate, async (req, res, next) => {
+router.patch('/:id/read', authenticate, [
+  param('id').isUUID().withMessage('Valid notification id required'),
+], validate, async (req, res, next) => {
   try {
-    await prisma.notification.updateMany({
+    const result = await prisma.notification.updateMany({
       where: { id: req.params.id, userId: req.user.id },
       data: { isRead: true },
     });

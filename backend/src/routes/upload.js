@@ -4,38 +4,76 @@ const { body } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const prisma = require('../lib/prisma');
-const { upload, uploadToCloudinary, deleteFromCloudinary } = require('../services/cloudinaryService');
-const jwt = require('jsonwebtoken');
+const { upload, uploadToCloudinary } = require('../services/cloudinaryService');
+const {
+  cleanupPendingUploads,
+  createPendingDescriptor,
+  schedulePendingUploadCleanup,
+  signUploadReceipt,
+  verifyUploadReceipt,
+} = require('../services/pendingUploadService');
 
 // POST /api/upload/images — upload up to 5 item images
 router.post('/images', authenticate, upload.array('images', 5), async (req, res, next) => {
+  let descriptors = [];
+  let pendingRegistered = false;
   try {
     if (!req.files?.length) {
       return res.status(400).json({ error: 'No images provided' });
     }
 
-    const results = await Promise.allSettled(
-      req.files.map(file => uploadToCloudinary(file.buffer))
-    );
-    const uploads = results.filter(result => result.status === 'fulfilled').map(result => result.value);
-    const failed = results.find(result => result.status === 'rejected');
+    // Register ownership before touching the external asset service. If the
+    // process fails after upload, the durable row still gives cleanup a publicId.
+    descriptors = req.files.map(() => createPendingDescriptor(req.user.id));
+    await prisma.pendingUpload.createMany({
+      data: descriptors.map((descriptor) => ({ ...descriptor, url: null })),
+    });
+    pendingRegistered = true;
 
-    if (failed) {
-      await Promise.all(uploads.map(image => deleteFromCloudinary(image.publicId)));
-      throw failed.reason;
-    }
+    const results = await Promise.allSettled(
+      req.files.map((file, index) => uploadToCloudinary(file.buffer, {
+        publicId: descriptors[index].publicId,
+      }))
+    );
+    const failed = results.find(result => result.status === 'rejected');
+    if (failed) throw failed.reason;
+
+    const uploaded = results.map((result, index) => {
+      const image = result.value;
+      if (image.publicId !== descriptors[index].publicId) {
+        const error = new Error('Image service returned an unexpected asset identifier');
+        error.status = 502;
+        throw error;
+      }
+      return image;
+    });
+
+    const ready = await prisma.$transaction(uploaded.map((image, index) =>
+      prisma.pendingUpload.update({
+        where: { id: descriptors[index].id },
+        data: { url: image.url },
+        select: { id: true, userId: true, url: true, publicId: true, expiresAt: true },
+      })
+    ));
 
     res.json({
-      images: uploads.map((image) => ({
-        ...image,
-        uploadToken: jwt.sign(
-          { purpose: 'item-upload', userId: req.user.id, url: image.url, publicId: image.publicId },
-          process.env.JWT_SECRET,
-          { expiresIn: '1h', algorithm: 'HS256' }
-        ),
+      images: ready.map((image) => ({
+        url: image.url,
+        publicId: image.publicId,
+        uploadToken: signUploadReceipt(image),
       })),
     });
+
+    void schedulePendingUploadCleanup().catch(() => {});
   } catch (err) {
+    if (pendingRegistered && descriptors.length) {
+      const ids = descriptors.map((descriptor) => descriptor.id);
+      await prisma.pendingUpload.updateMany({
+        where: { id: { in: ids } },
+        data: { expiresAt: new Date() },
+      }).catch(() => {});
+      void cleanupPendingUploads({ ids, limit: ids.length }).catch(() => {});
+    }
     next(err);
   }
 });
@@ -47,38 +85,21 @@ router.delete('/images', authenticate, [
   body('uploads.*.uploadToken').isString().isLength({ min: 20, max: 4000 }),
 ], validate, async (req, res, next) => {
   try {
-    const verifiedPublicIds = [];
-
-    for (const uploadReceipt of req.body.uploads) {
-      let payload;
-      try {
-        payload = jwt.verify(uploadReceipt.uploadToken, process.env.JWT_SECRET, {
-          algorithms: ['HS256'],
-        });
-      } catch {
-        return res.status(400).json({ error: 'An upload receipt is invalid or has expired' });
-      }
-
-      if (
-        payload.purpose !== 'item-upload' ||
-        payload.userId !== req.user.id ||
-        payload.publicId !== uploadReceipt.publicId
-      ) {
-        return res.status(403).json({ error: 'Upload receipt does not belong to this account' });
-      }
-
-      verifiedPublicIds.push(uploadReceipt.publicId);
+    const receipts = req.body.uploads.map((uploadReceipt) => verifyUploadReceipt(
+      uploadReceipt.uploadToken,
+      { userId: req.user.id, publicId: uploadReceipt.publicId }
+    ));
+    const ids = [...new Set(receipts.map((receipt) => receipt.id))];
+    if (ids.length !== receipts.length) {
+      return res.status(400).json({ error: 'Duplicate upload receipts are not allowed' });
     }
 
-    const uniquePublicIds = [...new Set(verifiedPublicIds)];
-    const attached = await prisma.itemImage.findMany({
-      where: { publicId: { in: uniquePublicIds } },
-      select: { publicId: true },
-    });
-    const attachedIds = new Set(attached.map(image => image.publicId));
-    const orphanedIds = uniquePublicIds.filter(publicId => !attachedIds.has(publicId));
-
-    await Promise.all(orphanedIds.map(deleteFromCloudinary));
+    // Only still-pending rows can be claimed for cleanup. Consumed receipts no
+    // longer have such a row, so replay can never delete an attached image.
+    const cleanup = await cleanupPendingUploads({ ids, userId: req.user.id, limit: ids.length });
+    if (cleanup.failed) {
+      return res.status(503).json({ error: 'Some images could not be removed. Please retry.' });
+    }
     return res.status(204).send();
   } catch (err) {
     next(err);

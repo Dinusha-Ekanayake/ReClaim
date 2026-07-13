@@ -1,11 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const { param } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
 const { getMatchesForItem, computeMatches } = require('../services/matchingService');
 const prisma = require('../lib/prisma');
 
 // GET /api/matches/:itemId — get matches for an item
-router.get('/:itemId', authenticate, async (req, res, next) => {
+router.get('/:itemId', authenticate, [
+  param('itemId').isUUID().withMessage('Valid item id required'),
+], validate, async (req, res, next) => {
   try {
     const { itemId } = req.params;
     const item = await prisma.item.findUnique({ where: { id: itemId } });
@@ -24,7 +28,9 @@ router.get('/:itemId', authenticate, async (req, res, next) => {
 });
 
 // POST /api/matches/:itemId/refresh — recompute matches
-router.post('/:itemId/refresh', authenticate, async (req, res, next) => {
+router.post('/:itemId/refresh', authenticate, [
+  param('itemId').isUUID().withMessage('Valid item id required'),
+], validate, async (req, res, next) => {
   try {
     const { itemId } = req.params;
     const item = await prisma.item.findUnique({ where: { id: itemId } });

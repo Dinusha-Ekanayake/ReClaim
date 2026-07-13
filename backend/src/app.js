@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const routes = require('./routes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const prisma = require('./lib/prisma');
+const { configuredFrontendOrigins } = require('./config/origins');
 
 // ─── App Factory ────────────────────────────────────────────────────────────
 // Builds and returns the configured Express app WITHOUT starting a listener,
@@ -20,10 +21,7 @@ function createApp() {
   // ─── Security & Middleware ──────────────────────────────────────────────────
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-  const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
+  const allowedOrigins = configuredFrontendOrigins();
 
   app.use(cors({
     origin(origin, cb) {
@@ -34,6 +32,15 @@ function createApp() {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   }));
+
+  // API responses are private by default. Optional-auth endpoints can contain
+  // owner/moderator-only fields and must never be replayed from a shared proxy.
+  app.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'private, no-store');
+    res.vary('Authorization');
+    res.vary('Cookie');
+    next();
+  });
 
   // Cookie-authenticated mutations must never be accepted from a cross-site browser.
   app.use((req, res, next) => {
@@ -50,6 +57,37 @@ function createApp() {
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
   }
+
+  // ─── Health Checks ──────────────────────────────────────────────────────────
+  // Keep liveness/readiness outside the public API limiter. Platform probes must
+  // remain reliable during traffic spikes and should not consume user quota.
+  app.get('/api/health', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), app: 'ReClaim API' });
+  });
+  let readinessResult = null;
+  let readinessCheckedAt = 0;
+  let readinessPromise = null;
+  app.get('/api/health/ready', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const now = Date.now();
+    if (!readinessResult || now - readinessCheckedAt >= 5_000) {
+      if (!readinessPromise) {
+        readinessPromise = prisma.$queryRaw`SELECT 1`
+          .then(() => ({ status: 'ready', database: 'connected' }))
+          .catch(() => ({ status: 'unavailable', database: 'disconnected' }))
+          .then((result) => {
+            readinessResult = result;
+            readinessCheckedAt = Date.now();
+            return result;
+          })
+          .finally(() => { readinessPromise = null; });
+      }
+      await readinessPromise;
+    }
+    const response = { ...readinessResult, timestamp: new Date().toISOString() };
+    res.status(readinessResult.status === 'ready' ? 200 : 503).json(response);
+  });
 
   // ─── Rate Limiting ──────────────────────────────────────────────────────────
   const limiter = rateLimit({
@@ -96,19 +134,7 @@ function createApp() {
   app.use('/api/contact', contactLimiter);
   app.use('/api/auth/forgot-password', passwordResetLimiter);
   app.use('/api/auth/reset-password', passwordResetLimiter);
-
-  // ─── Health Check ───────────────────────────────────────────────────────────
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), app: 'ReClaim API' });
-  });
-  app.get('/api/health/ready', async (req, res) => {
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      res.json({ status: 'ready', database: 'connected', timestamp: new Date().toISOString() });
-    } catch {
-      res.status(503).json({ status: 'unavailable', database: 'disconnected', timestamp: new Date().toISOString() });
-    }
-  });
+  app.use('/api/auth/resend-verification', passwordResetLimiter);
 
   // ─── Routes ─────────────────────────────────────────────────────────────────
   app.use('/api', routes);

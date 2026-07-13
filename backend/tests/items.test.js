@@ -21,8 +21,8 @@ describeWithDatabase('Items API', () => {
     const hashed = await bcrypt.hash(TEST_USER.password, 12);
     await prisma.user.upsert({
       where: { email: TEST_USER.email },
-      update: {},
-      create: { email: TEST_USER.email, password: hashed, name: TEST_USER.name },
+      update: { password: hashed, isVerified: true },
+      create: { email: TEST_USER.email, password: hashed, name: TEST_USER.name, isVerified: true },
     });
 
     const res = await request(app)
@@ -54,7 +54,8 @@ describeWithDatabase('Items API', () => {
         category: 'Bags & Wallets',
         color: 'Black',
         locationLabel: 'Library',
-        dateLostFound: new Date().toISOString(),
+        locationArea: 'Colombo 07',
+        dateLostFound: new Date().toISOString().slice(0, 10),
       });
 
     expect(res.statusCode).toBe(201);
@@ -72,7 +73,8 @@ describeWithDatabase('Items API', () => {
         description: 'short',
         category: 'Keys',
         locationLabel: 'Gym',
-        dateLostFound: new Date().toISOString(),
+        locationArea: 'Colombo 07',
+        dateLostFound: new Date().toISOString().slice(0, 10),
       });
 
     expect(res.statusCode).toBe(400);

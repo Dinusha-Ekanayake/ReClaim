@@ -2,6 +2,9 @@
   "name": "reclaim-backend",
   "version": "1.0.0",
   "description": "ReClaim Lost & Found Platform — Backend API",
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "main": "src/index.js",
   "scripts": {
     "dev": "nodemon src/index.js",
