@@ -1,7 +1,7 @@
 # ReClaim API Reference
 
 Base URL: `http://localhost:5000/api`  
-All protected routes require: `Authorization: Bearer <accessToken>`
+Protected routes accept the HttpOnly access cookie used by the web app or `Authorization: Bearer <accessToken>` for non-browser clients.
 
 ---
 
@@ -12,7 +12,7 @@ All protected routes require: `Authorization: Bearer <accessToken>`
 | POST | `/auth/register` | No | Register new user |
 | POST | `/auth/login` | No | Login, returns tokens |
 | POST | `/auth/refresh` | No | Refresh access token |
-| POST | `/auth/logout` | Yes | Logout + invalidate refresh token |
+| POST | `/auth/logout` | Cookie/Bearer optional | Logout + invalidate refresh token |
 | GET | `/auth/me` | Yes | Get current user profile |
 
 ### POST /auth/register
@@ -24,7 +24,7 @@ All protected routes require: `Authorization: Bearer <accessToken>`
 ```json
 { "email": "jane@email.com", "password": "Secret123" }
 ```
-Response: `{ user, accessToken, refreshToken }`
+Response: `{ user, accessToken }` plus HttpOnly access and refresh cookies. The refresh token is never exposed to browser JavaScript.
 
 ---
 

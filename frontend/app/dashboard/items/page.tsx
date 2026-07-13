@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Filter } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/authStore';
 import api from '@/lib/api';
 import ItemCard from '@/components/items/ItemCard';
@@ -28,7 +28,7 @@ export default function MyItemsPage() {
   useEffect(() => {
     if (!user?.id) return;
     setLoading(true);
-    api.get(`/users/${user.id}/items`, {
+    api.get('/users/me/items', {
       page, limit: 12,
       ...(f.type && { type: f.type }),
       ...(f.status && { status: f.status }),

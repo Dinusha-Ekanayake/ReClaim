@@ -1,16 +1,24 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 
+function cookieToken(req) {
+  const cookie = req.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith('reclaim_access='));
+  return cookie ? decodeURIComponent(cookie.slice('reclaim_access='.length)) : null;
+}
+
+function requestToken(req) {
+  const authHeader = req.headers.authorization;
+  return authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : cookieToken(req);
+}
+
 // ─── Authenticate User ────────────────────────────────────────────────────────
 const authenticate = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const token = requestToken(req);
+    if (!token) {
       return res.status(401).json({ error: 'Access token required' });
     }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -36,18 +44,16 @@ const authenticate = async (req, res, next) => {
 // ─── Optional Auth (for public routes that benefit from knowing the user) ─────
 const optionalAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) return next();
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const token = requestToken(req);
+    if (!token) return next();
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { id: true, email: true, name: true, role: true, avatarUrl: true },
+      select: { id: true, email: true, name: true, role: true, avatarUrl: true, isBanned: true },
     });
 
-    req.user = user || null;
+    req.user = user && !user.isBanned ? user : null;
     next();
   } catch {
     next();

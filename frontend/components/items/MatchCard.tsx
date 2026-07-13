@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { cn, getMatchScoreColor, getMatchScoreLabel, timeAgo } from '@/lib/utils';
+import { cn, getMatchScoreColor, getMatchScoreLabel } from '@/lib/utils';
 
 interface MatchCardProps { match: any; itemType: 'LOST' | 'FOUND'; }
 

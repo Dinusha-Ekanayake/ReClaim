@@ -10,3 +10,4 @@ build/
 Thumbs.db
 .vercel
 prisma/migrations/
+CLAUDE.md

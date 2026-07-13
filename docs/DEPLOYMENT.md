@@ -61,15 +61,12 @@ This repo includes a `render.yaml` **Blueprint**, so the easiest path is:
 
 **Manual setup (if you prefer not to use the Blueprint):**
 - **Root Directory**: `backend`
-- **Build Command**: `npm install && npx prisma generate`
+- **Build Command**: `npm ci && npx prisma generate && npx prisma migrate deploy`
 - **Start Command**: `npm start`
 - **Health Check Path**: `/api/health`
 
-> **Why no `prisma migrate deploy` in the build?** The schema is already applied
-> to your Supabase DB and the migration history isn't committed to git
-> (`prisma/migrations/` is gitignored). If you later commit migrations, add
-> `&& npx prisma migrate deploy` back to the build command. To apply schema
-> changes in the meantime, run `npx prisma db push` locally against Supabase.
+> Keep production schema changes in committed Prisma migrations. Do not use
+> `prisma db push` against production because it bypasses migration history.
 
 ---
 
@@ -104,7 +101,7 @@ The repo ships `.github/workflows/keep-alive.yml`, which pings the backend every
 ## 6. Post-Deployment Checklist
 
 ```bash
-# Seed the default admin (run once, from Render Shell or locally against Supabase)
+# Seed or rotate the configured admin (from Render Shell or locally against Supabase)
 cd backend
 node prisma/seed.js
 
@@ -112,8 +109,8 @@ node prisma/seed.js
 curl https://reclaim-api.onrender.com/api/health
 ```
 
-> No `prisma migrate deploy` here — the schema is already on Supabase. Use
-> `npx prisma db push` for future schema changes (see §3).
+> The Render build runs `prisma migrate deploy`. If you disable automatic
+> deploys, run it manually before starting the updated backend.
 
 ### Update CORS on backend
 Set `FRONTEND_URL` on Render to your Vercel URL. It accepts a **comma-separated
@@ -122,12 +119,12 @@ list**, so include preview domains if you use them:
 FRONTEND_URL=https://your-project.vercel.app,https://your-project-git-dev.vercel.app
 ```
 
-### Change default admin password
+### Verify the configured admin
 1. Log in at `your-project.vercel.app/auth/login`
    - Email: `admin@reclaim.app`
-   - Password: `Admin@123`
+   - Password: the unique `ADMIN_PASSWORD` configured for this environment
 2. Go to `/admin` → verify admin panel works
-3. **Change the password immediately** via Settings
+3. To rotate the password, update `ADMIN_PASSWORD` and run the seed again
 
 ---
 
@@ -161,7 +158,7 @@ PORT=5000
 NODE_ENV=production
 FRONTEND_URL=https://your-project.vercel.app
 ADMIN_EMAIL=admin@reclaim.app
-ADMIN_PASSWORD=Admin@123
+ADMIN_PASSWORD=<unique-password-with-at-least-12-characters>
 ADMIN_NAME=ReClaim Admin
 ```
 

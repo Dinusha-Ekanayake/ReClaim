@@ -7,6 +7,8 @@ import PublicLayout from '@/components/layout/PublicLayout';
 import ItemCard from '@/components/items/ItemCard';
 import api from '@/lib/api';
 import { CATEGORIES, COLORS, cn } from '@/lib/utils';
+import { useDebounce } from '@/hooks';
+import { toast } from '@/components/ui/toaster';
 
 const SORTS = [
   { value: 'createdAt', label: 'Newest First' },
@@ -33,21 +35,27 @@ function ItemsPageContent() {
     sort: 'createdAt',
     page: 1,
   });
+  const debouncedSearch = useDebounce(filters.search, 350);
 
-  const fetchItems = useCallback(async () => {
+  const fetchItems = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      const data = await api.get('/items', { ...filters, limit: 12, order: 'desc' });
+      const data = await api.get('/items', { ...filters, search: debouncedSearch, limit: 12, order: 'desc' }, { signal });
       setItems(data.items);
       setPagination(data.pagination);
-    } catch (e) {
-      console.error(e);
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
+      toast({ title: 'Could not load items', description: error.message, variant: 'destructive' });
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  }, [filters]);
+  }, [filters.type, filters.category, filters.color, filters.brand, filters.sort, filters.page, debouncedSearch]);
 
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchItems(controller.signal);
+    return () => controller.abort();
+  }, [fetchItems]);
 
   const updateFilter = (key: string, value: any) => setFilters(f => ({ ...f, [key]: value, page: 1 }));
   const clearFilters = () => setFilters({ type: '', category: '', search: '', color: '', brand: '', sort: 'createdAt', page: 1 });
@@ -205,7 +213,7 @@ function ItemsPageContent() {
               {items.map(item => (
                 <motion.div key={item.id}
                   variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE } } }}>
-                  <ItemCard item={item} />
+                  <ItemCard item={item} variant={viewMode} />
                 </motion.div>
               ))}
             </motion.div>

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'ReClaim',
     description: 'Find what matters. Return what\'s lost.',
-    images: ['/og-image.png'],
+    images: ['/opengraph-image'],
   },
 };
 

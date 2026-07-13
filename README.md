@@ -41,7 +41,7 @@ ReClaim is a smart Lost & Found platform that connects people with their missing
 
 ```
 reclaim/
-├── frontend/                  # Next.js 14 app
+├── frontend/                  # Next.js 16 app
 │   ├── app/                   # App Router pages
 │   │   ├── page.tsx           # Home
 │   │   ├── items/             # Browse, detail, new, edit
@@ -63,7 +63,7 @@ reclaim/
     │   └── lib/prisma.js      # Shared Prisma client singleton
     └── prisma/
         ├── schema.prisma      # Database schema
-        └── seed.js            # Seeds default admin user
+        └── seed.js            # Seeds the explicitly configured administrator
 ```
 
 ---
@@ -106,6 +106,9 @@ OPENAI_API_KEY=sk-...          # optional
 FRONTEND_URL=http://localhost:3000
 PORT=5000
 NODE_ENV=development
+ADMIN_EMAIL=admin@reclaim.app
+ADMIN_PASSWORD=replace-with-a-unique-strong-password
+ADMIN_NAME=ReClaim Admin
 ```
 
 **`frontend/.env.local`**
@@ -119,15 +122,15 @@ NEXT_PUBLIC_GOOGLE_MAPS_KEY=...   # optional
 
 ```bash
 cd backend
-npx prisma migrate dev --name init
+npx prisma migrate deploy
 npm run seed
 ```
 
-This creates all tables and seeds a default admin account:
+This applies committed migrations and seeds the explicitly configured admin account:
 - **Email:** `admin@reclaim.app`
-- **Password:** `Admin@123`
+- **Password:** set a unique `ADMIN_PASSWORD` (12+ characters) before seeding
 
-> Change these credentials immediately before going to production.
+Running the seed again rotates that account to the currently configured password.
 
 ### 4. Run in development
 
@@ -170,15 +173,17 @@ Matches are computed asynchronously after item creation. Pairs scoring ≥ 60 tr
 | Prefix | Description |
 |--------|-------------|
 | `POST /api/auth/register` | Create account |
-| `POST /api/auth/login` | Login, receive JWT pair |
-| `POST /api/auth/refresh` | Rotate refresh token |
+| `POST /api/auth/login` | Login; issue HttpOnly session cookies |
+| `POST /api/auth/refresh` | Rotate the HttpOnly refresh token |
 | `GET /api/items` | Browse items (filterable by type, category, date, location) |
 | `POST /api/items` | Post a new lost/found item |
 | `GET /api/matches/:itemId` | Get scored matches for an item |
 | `POST /api/claims` | Submit a claim for a found item |
+| `GET /api/claims/received` | List claims received by the current user |
+| `GET /api/users/me/items` | Private owner item list, including closed statuses |
 | `GET /api/chats` | List user's active chats |
 | `GET /api/notifications` | List notifications |
-| `POST /api/upload` | Upload images to Cloudinary |
+| `POST /api/upload/images` | Upload images and receive user-bound upload receipts |
 | `GET /api/admin/*` | Admin moderation endpoints (admin role required) |
 
 Full API reference: [`docs/API.md`](docs/API.md)

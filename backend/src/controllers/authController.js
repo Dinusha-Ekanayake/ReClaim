@@ -1,17 +1,72 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const prisma = require('../lib/prisma');
+
+const REFRESH_COOKIE = 'reclaim_refresh';
+const ACCESS_COOKIE = 'reclaim_access';
+
+const digestToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const refreshCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  path: '/api/auth',
+});
+
+const accessCookieOptions = () => ({ ...refreshCookieOptions(), path: '/' });
+
+function setRefreshCookie(res, token) {
+  const decoded = jwt.decode(token);
+  const maxAge = Math.max(0, decoded.exp * 1000 - Date.now());
+  res.cookie(REFRESH_COOKIE, token, { ...refreshCookieOptions(), maxAge });
+}
+
+function setAccessCookie(res, token) {
+  const decoded = jwt.decode(token);
+  const maxAge = Math.max(0, decoded.exp * 1000 - Date.now());
+  res.cookie(ACCESS_COOKIE, token, { ...accessCookieOptions(), maxAge });
+}
+
+function clearRefreshCookie(res) {
+  res.clearCookie(REFRESH_COOKIE, refreshCookieOptions());
+}
+
+function setAuthCookies(res, accessToken, refreshToken) {
+  setAccessCookie(res, accessToken);
+  setRefreshCookie(res, refreshToken);
+}
+
+function clearAuthCookies(res) {
+  res.clearCookie(ACCESS_COOKIE, accessCookieOptions());
+  clearRefreshCookie(res);
+}
+
+function getCookie(req, name) {
+  const header = req.headers.cookie;
+  if (!header) return undefined;
+  for (const part of header.split(';')) {
+    const [key, ...value] = part.trim().split('=');
+    if (key === name) return decodeURIComponent(value.join('='));
+  }
+  return undefined;
+}
+
+function requestRefreshToken(req) {
+  return getCookie(req, REFRESH_COOKIE) || req.body?.refreshToken;
+}
 
 const generateTokens = (userId) => {
   const accessToken = jwt.sign(
     { userId },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '15m', algorithm: 'HS256' }
   );
   const refreshToken = jwt.sign(
     { userId },
     process.env.JWT_REFRESH_SECRET,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d', algorithm: 'HS256' }
   );
   return { accessToken, refreshToken };
 };
@@ -37,13 +92,14 @@ exports.register = async (req, res, next) => {
     // Store refresh token
     await prisma.refreshToken.create({
       data: {
-        token: refreshToken,
+        token: digestToken(refreshToken),
         userId: user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(jwt.decode(refreshToken).exp * 1000),
       },
     });
 
-    res.status(201).json({ user, accessToken, refreshToken });
+    setAuthCookies(res, accessToken, refreshToken);
+    res.status(201).json({ user, accessToken });
   } catch (err) {
     next(err);
   }
@@ -65,14 +121,15 @@ exports.login = async (req, res, next) => {
 
     await prisma.refreshToken.create({
       data: {
-        token: refreshToken,
+        token: digestToken(refreshToken),
         userId: user.id,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(jwt.decode(refreshToken).exp * 1000),
       },
     });
 
     const { password: _, ...safeUser } = user;
-    res.json({ user: safeUser, accessToken, refreshToken });
+    setAuthCookies(res, accessToken, refreshToken);
+    res.json({ user: safeUser, accessToken });
   } catch (err) {
     next(err);
   }
@@ -81,28 +138,40 @@ exports.login = async (req, res, next) => {
 // POST /api/auth/refresh
 exports.refresh = async (req, res, next) => {
   try {
-    const { refreshToken } = req.body;
+    const refreshToken = requestRefreshToken(req);
     if (!refreshToken) return res.status(401).json({ error: 'Refresh token required' });
 
-    const stored = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET, { algorithms: ['HS256'] });
+    const digest = digestToken(refreshToken);
+    // Raw-token fallback supports sessions issued before refresh tokens were hashed.
+    const stored = await prisma.refreshToken.findFirst({
+      where: { OR: [{ token: digest }, { token: refreshToken }] },
+      include: { user: { select: { id: true, isBanned: true } } },
+    });
     if (!stored || stored.expiresAt < new Date()) {
+      clearRefreshCookie(res);
       return res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
-
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    if (stored.userId !== decoded.userId || stored.user.isBanned) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
     const tokens = generateTokens(decoded.userId);
 
     // Rotate refresh token
-    await prisma.refreshToken.delete({ where: { token: refreshToken } });
-    await prisma.refreshToken.create({
-      data: {
-        token: tokens.refreshToken,
-        userId: decoded.userId,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.refreshToken.delete({ where: { id: stored.id } });
+      await tx.refreshToken.create({
+        data: {
+          token: digestToken(tokens.refreshToken),
+          userId: decoded.userId,
+          expiresAt: new Date(jwt.decode(tokens.refreshToken).exp * 1000),
+        },
+      });
     });
 
-    res.json(tokens);
+    setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+    res.json({ accessToken: tokens.accessToken });
   } catch (err) {
     next(err);
   }
@@ -111,14 +180,25 @@ exports.refresh = async (req, res, next) => {
 // POST /api/auth/logout
 exports.logout = async (req, res, next) => {
   try {
-    const { refreshToken } = req.body;
+    const refreshToken = requestRefreshToken(req);
     if (refreshToken) {
-      await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
+      await prisma.refreshToken.deleteMany({
+        where: { OR: [{ token: digestToken(refreshToken) }, { token: refreshToken }] },
+      });
     }
+    clearAuthCookies(res);
     res.json({ message: 'Logged out successfully' });
   } catch (err) {
     next(err);
   }
+};
+
+exports.requireTrustedOrigin = (req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin) return next();
+  const allowed = (process.env.FRONTEND_URL || 'http://localhost:3000').split(',').map((value) => value.trim());
+  if (!allowed.includes(origin)) return res.status(403).json({ error: 'Origin not allowed' });
+  next();
 };
 
 // GET /api/auth/me

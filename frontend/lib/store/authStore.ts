@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import api from '@/lib/api';
+import api, { restoreAccessToken, setAccessToken } from '@/lib/api';
 
 interface User {
   id: string;
@@ -26,14 +26,14 @@ interface AuthState {
   updateUser: (data: Partial<User>) => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoading: false,
   isInitialized: false,
 
   initialize: async () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
+    const restored = await restoreAccessToken();
+    if (!restored) {
       set({ isInitialized: true });
       return;
     }
@@ -41,8 +41,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = await api.get('/auth/me');
       set({ user, isInitialized: true });
     } catch {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('hasSession');
+      setAccessToken(null);
       set({ user: null, isInitialized: true });
     }
   },
@@ -51,8 +51,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const data = await api.post('/auth/login', { email, password });
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
+      setAccessToken(data.accessToken);
+      localStorage.setItem('hasSession', 'true');
       set({ user: data.user, isLoading: false });
     } catch (err) {
       set({ isLoading: false });
@@ -64,8 +64,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const data = await api.post('/auth/register', { name, email, password });
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
+      setAccessToken(data.accessToken);
+      localStorage.setItem('hasSession', 'true');
       set({ user: data.user, isLoading: false });
     } catch (err) {
       set({ isLoading: false });
@@ -74,12 +74,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    const refreshToken = localStorage.getItem('refreshToken');
     try {
-      await api.post('/auth/logout', { refreshToken });
+      await api.post('/auth/logout');
     } catch {}
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('hasSession');
+    setAccessToken(null);
     set({ user: null });
   },
 

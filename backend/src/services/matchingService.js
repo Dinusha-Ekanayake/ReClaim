@@ -1,5 +1,12 @@
 const prisma = require('../lib/prisma');
 const { createNotification } = require('./notificationService');
+const { publicItemSelect, publicUserSelect, primaryImageSelect } = require('../utils/selects');
+
+const matchingItemSelect = {
+  id: true, type: true, status: true, userId: true, title: true, description: true,
+  category: true, brand: true, color: true, locationLat: true, locationLng: true,
+  locationLabel: true, dateLostFound: true, embedding: true,
+};
 
 // ─── Keyword Overlap Score (0-1) ──────────────────────────────────────────────
 function keywordScore(textA, textB) {
@@ -111,7 +118,7 @@ function computeScore(lostItem, foundItem) {
 
 // ─── Main: Compute and Store Matches for an Item ──────────────────────────────
 async function computeMatches(itemId) {
-  const item = await prisma.item.findUnique({ where: { id: itemId } });
+  const item = await prisma.item.findUnique({ where: { id: itemId }, select: matchingItemSelect });
   if (!item || item.status !== 'ACTIVE') return;
 
   const MIN_SCORE = 30; // Only store matches above this threshold
@@ -125,6 +132,9 @@ async function computeMatches(itemId) {
       isApproved: true,
       category: item.category, // Quick pre-filter by category
     },
+    select: matchingItemSelect,
+    orderBy: { createdAt: 'desc' },
+    take: 500,
   });
 
   const matches = [];
@@ -141,13 +151,20 @@ async function computeMatches(itemId) {
   // Upsert matches (sort by score descending, keep top 20)
   const top = matches.sort((a, b) => b.score - a.score).slice(0, 20);
 
-  for (const match of top) {
-    await prisma.match.upsert({
+  if (top.length) await prisma.$transaction(top.map((match) => prisma.match.upsert({
       where: { lostItemId_foundItemId: { lostItemId: match.lostItemId, foundItemId: match.foundItemId } },
       create: { ...match, isNotified: false },
       update: { score: match.score, breakdown: match.breakdown },
-    });
-  }
+  })));
+
+  // Remove matches that fell below the threshold or out of the current top set.
+  const currentPairs = top.map(({ lostItemId, foundItemId }) => ({ lostItemId, foundItemId }));
+  await prisma.match.deleteMany({
+    where: {
+      OR: [{ lostItemId: itemId }, { foundItemId: itemId }],
+      ...(currentPairs.length ? { NOT: { OR: currentPairs } } : {}),
+    },
+  });
 
   // Notify item owners of new high-confidence matches (score >= 60, not yet notified)
   // Query DB after upsert — in-memory objects never carry isNotified from prior runs.
@@ -155,12 +172,22 @@ async function computeMatches(itemId) {
     lostItemId: m.lostItemId, foundItemId: m.foundItemId,
   }));
   const highConfidence = highConfidencePairs.length > 0
-    ? await prisma.match.findMany({ where: { isNotified: false, OR: highConfidencePairs } })
+    ? await prisma.match.findMany({
+        where: { isNotified: false, OR: highConfidencePairs },
+        include: {
+          lostItem: { select: { userId: true, title: true } },
+          foundItem: { select: { userId: true, title: true } },
+        },
+      })
     : [];
 
   for (const match of highConfidence) {
-    const lostItem = await prisma.item.findUnique({ where: { id: match.lostItemId }, select: { userId: true, title: true } });
-    const foundItem = await prisma.item.findUnique({ where: { id: match.foundItemId }, select: { userId: true, title: true } });
+    const claimed = await prisma.match.updateMany({
+      where: { id: match.id, isNotified: false },
+      data: { isNotified: true },
+    });
+    if (!claimed.count) continue;
+    const { lostItem, foundItem } = match;
 
     if (lostItem) {
       await createNotification(
@@ -178,11 +205,6 @@ async function computeMatches(itemId) {
         `/items/${match.foundItemId}`
       );
     }
-
-    await prisma.match.update({
-      where: { lostItemId_foundItemId: { lostItemId: match.lostItemId, foundItemId: match.foundItemId } },
-      data: { isNotified: true },
-    });
   }
 
   return top;
@@ -190,32 +212,22 @@ async function computeMatches(itemId) {
 
 // ─── Get Matches for an Item ──────────────────────────────────────────────────
 async function getMatchesForItem(itemId) {
-  const item = await prisma.item.findUnique({ where: { id: itemId } });
+  const item = await prisma.item.findUnique({ where: { id: itemId }, select: { type: true } });
   if (!item) return [];
 
   const matches = item.type === 'LOST'
     ? await prisma.match.findMany({
-        where: { lostItemId: itemId },
+        where: { lostItemId: itemId, foundItem: { isApproved: true, status: { not: 'REJECTED' } } },
         orderBy: { score: 'desc' },
         include: {
-          foundItem: {
-            include: {
-              images: { where: { isPrimary: true }, take: 1 },
-              user: { select: { id: true, name: true, avatarUrl: true } },
-            },
-          },
+          foundItem: { select: { ...publicItemSelect, images: primaryImageSelect, user: { select: publicUserSelect } } },
         },
       })
     : await prisma.match.findMany({
-        where: { foundItemId: itemId },
+        where: { foundItemId: itemId, lostItem: { isApproved: true, status: { not: 'REJECTED' } } },
         orderBy: { score: 'desc' },
         include: {
-          lostItem: {
-            include: {
-              images: { where: { isPrimary: true }, take: 1 },
-              user: { select: { id: true, name: true, avatarUrl: true } },
-            },
-          },
+          lostItem: { select: { ...publicItemSelect, images: primaryImageSelect, user: { select: publicUserSelect } } },
         },
       });
 

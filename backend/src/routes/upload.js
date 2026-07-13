@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const { upload, uploadToCloudinary, uploadAvatar } = require('../services/cloudinaryService');
+const jwt = require('jsonwebtoken');
 
 // POST /api/upload/images — upload up to 5 item images
 router.post('/images', authenticate, upload.array('images', 5), async (req, res, next) => {
@@ -14,7 +15,16 @@ router.post('/images', authenticate, upload.array('images', 5), async (req, res,
       req.files.map(file => uploadToCloudinary(file.buffer))
     );
 
-    res.json({ images: uploads });
+    res.json({
+      images: uploads.map((image) => ({
+        ...image,
+        uploadToken: jwt.sign(
+          { purpose: 'item-upload', userId: req.user.id, url: image.url, publicId: image.publicId },
+          process.env.JWT_SECRET,
+          { expiresIn: '1h', algorithm: 'HS256' }
+        ),
+      })),
+    });
   } catch (err) {
     next(err);
   }

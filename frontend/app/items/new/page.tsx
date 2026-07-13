@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Upload, X, Plus, Minus, AlertCircle, CheckCircle } from 'lucide-react';
 import PublicLayout from '@/components/layout/PublicLayout';
-import { useIsLoggedIn } from '@/lib/store/authStore';
+import { useAuthStore, useIsLoggedIn } from '@/lib/store/authStore';
 import api, { ApiError } from '@/lib/api';
 import { CATEGORIES, COLORS, cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -14,6 +14,7 @@ function NewItemPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isLoggedIn = useIsLoggedIn();
+  const isInitialized = useAuthStore(s => s.isInitialized);
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -37,6 +38,10 @@ function NewItemPageContent() {
     dateLostFound: new Date().toISOString().split('T')[0],
     showContactInfo: false,
   });
+
+  if (!isInitialized) {
+    return <PublicLayout><div className="min-h-[60vh] flex items-center justify-center"><div className="skeleton h-10 w-48 rounded-xl" /></div></PublicLayout>;
+  }
 
   if (!isLoggedIn) {
     return (
@@ -63,7 +68,16 @@ function NewItemPageContent() {
     setForm((f) => ({ ...f, [field]: value }));
 
   const handleImages = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).slice(0, 5 - images.length);
+    setError('');
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+    const selected = Array.from(e.target.files || []);
+    const invalid = selected.find((file) => !allowed.includes(file.type) || file.size > 5 * 1024 * 1024);
+    if (invalid) {
+      setError('Images must be JPEG, PNG, WebP, or AVIF and no larger than 5 MB.');
+      e.target.value = '';
+      return;
+    }
+    const files = selected.slice(0, 5 - images.length);
 
     files.forEach((file) => {
       const preview = URL.createObjectURL(file);
@@ -72,10 +86,13 @@ function NewItemPageContent() {
   };
 
   const removeImage = (i: number) => {
-    setImages((prev) => prev.filter((_, idx) => idx !== i));
+    setImages((prev) => {
+      URL.revokeObjectURL(prev[i].preview);
+      return prev.filter((_, idx) => idx !== i);
+    });
   };
 
-  const uploadImages = async (): Promise<{ url: string; publicId: string }[]> => {
+  const uploadImages = async (): Promise<{ url: string; publicId: string; uploadToken: string }[]> => {
     if (images.length === 0) return [];
 
     const fd = new FormData();
@@ -128,6 +145,7 @@ function NewItemPageContent() {
         locationArea: form.locationArea.trim(),
         imageUrls: uploaded.map((u) => u.url),
         imagePublicIds: uploaded.map((u) => u.publicId),
+        imageUploadTokens: uploaded.map((u) => u.uploadToken),
         verificationHints: hints.map((h) => h.trim()).filter(Boolean),
       });
 
@@ -460,14 +478,13 @@ function NewItemPageContent() {
               {form.type === 'FOUND' && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Verification Hints{' '}
+                    Private Verification Checklist{' '}
                     <span className="text-gray-400 dark:text-gray-500 font-normal">
                       (hidden from public)
                     </span>
                   </label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                    Add hidden details that only the real owner would know.
-                    Claimants must answer correctly.
+                    Record details only the real owner should know. These stay private and help you compare a claimant&apos;s answers.
                   </p>
 
                   <div className="space-y-2">
@@ -481,7 +498,7 @@ function NewItemPageContent() {
                             next[i] = e.target.value;
                             setHints(next);
                           }}
-                          placeholder={`Hidden detail ${i + 1}`}
+                          placeholder={`Expected detail ${i + 1}`}
                           className="input-field flex-1 text-sm"
                         />
 

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Shield, AlertCircle } from 'lucide-react';
 import api, { ApiError } from '@/lib/api';
@@ -15,6 +15,17 @@ export default function ClaimModal({ item, onClose, onSuccess }: ClaimModalProps
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onClose]);
 
   // Generate verification questions based on item type/category
   const questions = [
@@ -52,6 +63,9 @@ export default function ClaimModal({ item, onClose, onSuccess }: ClaimModalProps
       onClick={onClose}
     >
       <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="claim-dialog-title"
         initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         onClick={e => e.stopPropagation()}
@@ -59,10 +73,10 @@ export default function ClaimModal({ item, onClose, onSuccess }: ClaimModalProps
       >
         <div className="sticky top-0 bg-white dark:bg-gray-900 flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 z-10">
           <div>
-            <h2 className="font-display font-bold text-gray-900 dark:text-white">Claim This Item</h2>
+            <h2 id="claim-dialog-title" className="font-display font-bold text-gray-900 dark:text-white">Claim This Item</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">{item.title}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors text-gray-500 dark:text-gray-400">
+          <button onClick={onClose} aria-label="Close claim dialog" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors text-gray-500 dark:text-gray-400">
             <X size={20} />
           </button>
         </div>
@@ -82,13 +96,15 @@ export default function ClaimModal({ item, onClose, onSuccess }: ClaimModalProps
           {/* Questions */}
           {questions.map((q, i) => (
             <div key={i}>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor={`claim-answer-${i}`} className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 {i + 1}. {q}
               </label>
               <textarea
+                id={`claim-answer-${i}`}
                 value={answers[`q${i}`] || ''}
                 onChange={e => setAnswers(prev => ({ ...prev, [`q${i}`]: e.target.value }))}
                 rows={2}
+                maxLength={500}
                 className="input-field resize-none"
                 placeholder="Your answer..."
               />
@@ -97,13 +113,15 @@ export default function ClaimModal({ item, onClose, onSuccess }: ClaimModalProps
 
           {/* Message */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="claim-message" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Additional Message <span className="text-gray-400 dark:text-gray-500 font-normal">(optional)</span>
             </label>
             <textarea
+              id="claim-message"
               value={message}
               onChange={e => setMessage(e.target.value)}
               rows={3}
+              maxLength={500}
               className="input-field resize-none"
               placeholder="Anything else you'd like the finder to know..."
             />

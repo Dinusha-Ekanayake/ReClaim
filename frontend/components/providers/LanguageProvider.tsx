@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { type Locale, translations } from '@/lib/i18n';
 
 interface LanguageContextValue {
@@ -15,7 +15,21 @@ const LanguageContext = createContext<LanguageContextValue>({
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocale] = useState<Locale>('en');
+  const [locale, setLocaleState] = useState<Locale>('en');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('locale') as Locale | null;
+    if (saved && translations[saved]) setLocaleState(saved);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
+  const setLocale = useCallback((next: Locale) => {
+    setLocaleState(next);
+    localStorage.setItem('locale', next);
+  }, []);
 
   const t = useCallback((key: string, fallback?: string): string => {
     return translations[locale]?.[key] ?? translations.en[key] ?? fallback ?? key;

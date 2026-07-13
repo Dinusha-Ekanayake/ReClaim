@@ -1,13 +1,33 @@
 const express = require('express');
 const router = express.Router();
+const { body, query } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
-const { uploadAvatar } = require('../services/cloudinaryService');
-const multer = require('multer');
+const { upload, uploadAvatar } = require('../services/cloudinaryService');
+const { validate } = require('../middleware/validate');
 const prisma = require('../lib/prisma');
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const { getPagination, paginationResult } = require('../utils/query');
+const { publicItemSelect, publicUserSelect, primaryImageSelect } = require('../utils/selects');
+
+const ITEM_TYPES = ['LOST', 'FOUND'];
+const ITEM_STATUSES = ['ACTIVE', 'MATCHED', 'CLAIM_PENDING', 'RETURNED', 'CLOSED'];
+
+function itemListSelect() {
+  return {
+    ...publicItemSelect,
+    images: primaryImageSelect,
+    user: { select: publicUserSelect },
+    _count: { select: { comments: { where: { isHidden: false } } } },
+  };
+}
 
 // PATCH /api/users/me — update profile (must be before /:id to avoid Express matching "me" as an ID)
-router.patch('/me', authenticate, async (req, res, next) => {
+router.patch('/me', authenticate, [
+  body('name').optional().trim().isLength({ min: 2, max: 50 }),
+  body('bio').optional({ nullable: true }).trim().isLength({ max: 500 }),
+  body('location').optional({ nullable: true }).trim().isLength({ max: 160 }),
+  body('phone').optional({ nullable: true, checkFalsy: true }).trim().matches(/^\+?[0-9 ()-]{7,20}$/).withMessage('Invalid phone number'),
+  body('showPhone').optional().isBoolean(),
+], validate, async (req, res, next) => {
   try {
     const { name, bio, location, phone, showPhone } = req.body;
     const updated = await prisma.user.update({
@@ -46,11 +66,49 @@ router.post('/me/avatar', authenticate, upload.single('avatar'), async (req, res
   }
 });
 
+// GET /api/users/me/items — private owner view, including non-public statuses.
+router.get('/me/items', authenticate, [
+  query('type').optional().isIn(ITEM_TYPES),
+  query('status').optional().isIn([...ITEM_STATUSES, 'REJECTED']),
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 50 }),
+], validate, async (req, res, next) => {
+  try {
+    const { type, status } = req.query;
+    const pagination = getPagination(req.query, { defaultLimit: 12, maxLimit: 50 });
+    const where = {
+      userId: req.user.id,
+      ...(type && { type }),
+      ...(status && { status }),
+    };
+
+    const [items, total] = await Promise.all([
+      prisma.item.findMany({
+        where,
+        skip: pagination.skip,
+        take: pagination.limit,
+        orderBy: { createdAt: 'desc' },
+        select: itemListSelect(),
+      }),
+      prisma.item.count({ where }),
+    ]);
+
+    res.json({ items, ...paginationResult(total, pagination.page, pagination.limit) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/users/:id/items (must come before /:id so Express doesn't mistake "items" for an id)
-router.get('/:id/items', async (req, res, next) => {
+router.get('/:id/items', [
+  query('type').optional().isIn(ITEM_TYPES),
+  query('status').optional().isIn(ITEM_STATUSES),
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 50 }),
+], validate, async (req, res, next) => {
   try {
     const { type, status = 'ACTIVE', page = 1, limit = 12 } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const pagination = getPagination({ page, limit }, { defaultLimit: 12, maxLimit: 50 });
 
     const where = {
       userId: req.params.id,
@@ -62,15 +120,15 @@ router.get('/:id/items', async (req, res, next) => {
     const [items, total] = await Promise.all([
       prisma.item.findMany({
         where,
-        skip,
-        take: Number(limit),
+        skip: pagination.skip,
+        take: pagination.limit,
         orderBy: { createdAt: 'desc' },
-        include: { images: { where: { isPrimary: true }, take: 1 } },
+        select: itemListSelect(),
       }),
       prisma.item.count({ where }),
     ]);
 
-    res.json({ items, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+    res.json({ items, ...paginationResult(total, pagination.page, pagination.limit) });
   } catch (err) {
     next(err);
   }
@@ -84,7 +142,7 @@ router.get('/:id', async (req, res, next) => {
       select: {
         id: true, name: true, avatarUrl: true, bio: true,
         location: true, createdAt: true,
-        _count: { select: { items: true } },
+        _count: { select: { items: { where: { isApproved: true, status: { not: 'REJECTED' } } } } },
       },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });

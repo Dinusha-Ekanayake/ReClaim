@@ -28,11 +28,8 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const token = localStorage.getItem('accessToken');
-    if (!token) return;
-
     const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000', {
-      auth: { token },
+      withCredentials: true,
       transports: ['websocket', 'polling'],
     });
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
+const { getPagination, paginationResult } = require('../utils/query');
 
 // GET /api/chats — get all chats for current user
 router.get('/', authenticate, async (req, res, next) => {
@@ -28,6 +29,7 @@ router.get('/', authenticate, async (req, res, next) => {
         },
       },
       orderBy: { updatedAt: 'desc' },
+      take: 100,
     });
 
     res.json(chats);
@@ -40,14 +42,13 @@ router.get('/', authenticate, async (req, res, next) => {
 router.get('/:id', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { page = 1, limit = 30 } = req.query;
+    const pagination = getPagination(req.query, { defaultLimit: 30, maxLimit: 100 });
 
     const participant = await prisma.chatParticipant.findUnique({
       where: { chatId_userId: { chatId: id, userId: req.user.id } },
     });
-    if (!participant) return res.status(403).json({ error: 'Not a participant' });
+    if (!participant) return res.status(404).json({ error: 'Chat not found' });
 
-    const skip = (Number(page) - 1) * Number(limit);
     const [chat, messages, total] = await Promise.all([
       prisma.chat.findUnique({
         where: { id },
@@ -60,30 +61,17 @@ router.get('/:id', authenticate, async (req, res, next) => {
       prisma.message.findMany({
         where: { chatId: id },
         orderBy: { createdAt: 'desc' },
-        skip,
-        take: Number(limit),
+        skip: pagination.skip,
+        take: pagination.limit,
         include: { sender: { select: { id: true, name: true, avatarUrl: true } } },
       }),
       prisma.message.count({ where: { chatId: id } }),
     ]);
 
-    // Mark messages as read
-    await prisma.message.updateMany({
-      where: { chatId: id, senderId: { not: req.user.id }, isRead: false },
-      data: { isRead: true },
-    });
-    await prisma.chatParticipant.update({
-      where: { chatId_userId: { chatId: id, userId: req.user.id } },
-      data: { lastReadAt: new Date() },
-    });
-
     res.json({
       chat,
       messages: messages.reverse(),
-      pagination: {
-        total, page: Number(page), limit: Number(limit),
-        pages: Math.ceil(total / Number(limit)),
-      },
+      pagination: paginationResult(total, pagination.page, pagination.limit),
     });
   } catch (err) {
     next(err);
@@ -94,46 +82,48 @@ router.get('/:id', authenticate, async (req, res, next) => {
 router.post('/', authenticate, async (req, res, next) => {
   try {
     const { recipientId, itemId } = req.body;
-    if (!recipientId) return res.status(400).json({ error: 'recipientId required' });
+    if (typeof recipientId !== 'string' || !recipientId || recipientId.length > 64) {
+      return res.status(400).json({ error: 'Valid recipientId required' });
+    }
+    if (itemId !== undefined && (typeof itemId !== 'string' || !itemId || itemId.length > 64)) {
+      return res.status(400).json({ error: 'Invalid itemId' });
+    }
     if (recipientId === req.user.id) return res.status(400).json({ error: 'Cannot chat with yourself' });
 
-    // Check if chat already exists between these two users
-    const existing = await prisma.chat.findFirst({
-      where: {
-        AND: [
-          { participants: { some: { userId: req.user.id } } },
-          { participants: { some: { userId: recipientId } } },
-          ...(itemId ? [{ itemId }] : []),
-        ],
-      },
-      include: {
-        participants: {
-          include: { user: { select: { id: true, name: true, avatarUrl: true } } },
-        },
-      },
-    });
+    const [recipient, item] = await Promise.all([
+      prisma.user.findUnique({ where: { id: recipientId }, select: { id: true, isBanned: true } }),
+      itemId ? prisma.item.findUnique({ where: { id: itemId }, select: { id: true, userId: true, isApproved: true, status: true } }) : null,
+    ]);
+    if (!recipient || recipient.isBanned) return res.status(404).json({ error: 'Recipient not found' });
+    if (itemId && (!item || !item.isApproved || item.status === 'REJECTED')) return res.status(404).json({ error: 'Item not found' });
+    if (item && item.userId !== recipientId) return res.status(400).json({ error: 'Recipient is not the item owner' });
 
-    if (existing) return res.json(existing);
-
-    // Create new chat
-    const chat = await prisma.chat.create({
-      data: {
-        itemId: itemId || null,
-        participants: {
-          create: [
-            { userId: req.user.id },
-            { userId: recipientId },
+    const userIds = [req.user.id, recipientId].sort();
+    const lockKey = `chat:${userIds.join(':')}:${itemId || 'direct'}`;
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      const existing = await tx.chat.findFirst({
+        where: {
+          AND: [
+            { participants: { some: { userId: req.user.id } } },
+            { participants: { some: { userId: recipientId } } },
+            { itemId: itemId || null },
           ],
         },
-      },
-      include: {
-        participants: {
-          include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+        include: { participants: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } } },
+      });
+      if (existing) return { chat: existing, created: false };
+      const chat = await tx.chat.create({
+        data: {
+          itemId: itemId || null,
+          participants: { create: [{ userId: req.user.id }, { userId: recipientId }] },
         },
-      },
+        include: { participants: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } } },
+      });
+      return { chat, created: true };
     });
 
-    res.status(201).json(chat);
+    res.status(result.created ? 201 : 200).json(result.chat);
   } catch (err) {
     next(err);
   }

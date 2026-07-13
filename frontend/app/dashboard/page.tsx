@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Plus, Package, CheckCircle, Clock, MessageSquare, Bell, ArrowRight, Star } from 'lucide-react';
+import { Plus, Package, CheckCircle, Clock, ArrowRight, Star } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/authStore';
 import api from '@/lib/api';
 import ItemCard from '@/components/items/ItemCard';

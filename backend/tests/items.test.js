@@ -1,17 +1,22 @@
-const request = require('supertest');
-const bcrypt = require('bcryptjs');
-const { createApp } = require('../src/app');
-const prisma = require('../src/lib/prisma');
-
-const app = createApp();
-
 const TEST_USER = { email: 'test@example.com', password: 'Test1234', name: 'Test User' };
+const describeWithDatabase = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 
-describe('Items API', () => {
+describeWithDatabase('Items API', () => {
+  let request;
+  let bcrypt;
+  let app;
+  let prisma;
   let token;
   let createdItemId;
 
   beforeAll(async () => {
+    // Never allow integration tests to mutate the regular development/production database.
+    process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+    request = require('supertest');
+    bcrypt = require('bcryptjs');
+    const { createApp } = require('../src/app');
+    prisma = require('../src/lib/prisma');
+    app = createApp();
     // Ensure the test user exists (idempotent).
     const hashed = await bcrypt.hash(TEST_USER.password, 12);
     await prisma.user.upsert({

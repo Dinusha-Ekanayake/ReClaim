@@ -1,4 +1,5 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+let accessToken: string | null = null;
 
 class ApiError extends Error {
   status: number;
@@ -11,32 +12,47 @@ class ApiError extends Error {
 }
 
 async function getAccessToken(): Promise<string | null> {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('accessToken');
+  return accessToken;
+}
+
+export function setAccessToken(token: string | null) {
+  accessToken = token;
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = localStorage.getItem('refreshToken');
-  if (!refreshToken) return null;
-
   try {
     const res = await fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
+      credentials: 'include',
     });
     if (!res.ok) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('hasSession');
+      setAccessToken(null);
       return null;
     }
     const data = await res.json();
-    localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
+    setAccessToken(data.accessToken);
+    localStorage.setItem('hasSession', 'true');
     return data.accessToken;
   } catch {
     return null;
   }
+}
+
+let refreshPromise: Promise<string | null> | null = null;
+
+function refreshOnce() {
+  if (!refreshPromise) {
+    refreshPromise = refreshAccessToken().finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+}
+
+export async function restoreAccessToken(): Promise<boolean> {
+  if (typeof window === 'undefined' || localStorage.getItem('hasSession') !== 'true') return false;
+  if (accessToken) return true;
+  return !!(await refreshOnce());
 }
 
 interface RequestOptions extends RequestInit {
@@ -67,20 +83,20 @@ async function request<T = any>(endpoint: string, options: RequestOptions = {}):
   };
 
   if (!skipAuth) {
-    let token = await getAccessToken();
+    const token = await getAccessToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, { ...fetchOptions, headers });
+  const response = await fetch(url, { ...fetchOptions, headers, credentials: 'include' });
 
   // Token expired — try refresh
   if (response.status === 401 && !skipAuth) {
     const data = await response.json().catch(() => ({}));
     if (data.code === 'TOKEN_EXPIRED') {
-      const newToken = await refreshAccessToken();
+      const newToken = await refreshOnce();
       if (newToken) {
         headers['Authorization'] = `Bearer ${newToken}`;
-        const retryResponse = await fetch(url, { ...fetchOptions, headers });
+        const retryResponse = await fetch(url, { ...fetchOptions, headers, credentials: 'include' });
         if (!retryResponse.ok) {
           const errData = await retryResponse.json().catch(() => ({}));
           throw new ApiError(errData.error || 'Request failed', retryResponse.status, errData);
@@ -108,8 +124,8 @@ async function request<T = any>(endpoint: string, options: RequestOptions = {}):
 
 // ─── API Methods ──────────────────────────────────────────────────────────────
 export const api = {
-  get: <T = any>(endpoint: string, params?: RequestOptions['params']) =>
-    request<T>(endpoint, { method: 'GET', params }),
+  get: <T = any>(endpoint: string, params?: RequestOptions['params'], options: RequestInit = {}) =>
+    request<T>(endpoint, { ...options, method: 'GET', params }),
 
   post: <T = any>(endpoint: string, body?: any) =>
     request<T>(endpoint, { method: 'POST', body: body instanceof FormData ? body : JSON.stringify(body) }),

@@ -9,6 +9,8 @@ const prisma = require('../lib/prisma');
 router.get('/:itemId', async (req, res, next) => {
   try {
     const { itemId } = req.params;
+    const item = await prisma.item.findFirst({ where: { id: itemId, isApproved: true, status: { not: 'REJECTED' } }, select: { id: true } });
+    if (!item) return res.status(404).json({ error: 'Item not found' });
     const comments = await prisma.comment.findMany({
       where: { itemId, parentId: null, isHidden: false },
       include: {
@@ -17,9 +19,11 @@ router.get('/:itemId', async (req, res, next) => {
           where: { isHidden: false },
           include: { user: { select: { id: true, name: true, avatarUrl: true } } },
           orderBy: { createdAt: 'asc' },
+          take: 50,
         },
       },
       orderBy: { createdAt: 'desc' },
+      take: 100,
     });
     res.json(comments);
   } catch (err) {
@@ -37,8 +41,12 @@ router.post('/:itemId',
       const { itemId } = req.params;
       const { content, parentId } = req.body;
 
-      const item = await prisma.item.findUnique({ where: { id: itemId } });
+      const item = await prisma.item.findFirst({ where: { id: itemId, isApproved: true, status: { not: 'REJECTED' } } });
       if (!item) return res.status(404).json({ error: 'Item not found' });
+      if (parentId) {
+        const parent = await prisma.comment.findFirst({ where: { id: parentId, itemId, parentId: null, isHidden: false }, select: { id: true } });
+        if (!parent) return res.status(400).json({ error: 'Invalid parent comment' });
+      }
 
       const comment = await prisma.comment.create({
         data: { itemId, userId: req.user.id, content, parentId: parentId || null },
@@ -66,12 +74,19 @@ router.post('/:itemId',
 // DELETE /api/comments/:id
 router.delete('/:id', authenticate, async (req, res, next) => {
   try {
-    const comment = await prisma.comment.findUnique({ where: { id: req.params.id } });
+    const comment = await prisma.comment.findUnique({
+      where: { id: req.params.id },
+      include: { _count: { select: { replies: true } } },
+    });
     if (!comment) return res.status(404).json({ error: 'Comment not found' });
     if (comment.userId !== req.user.id && !['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    await prisma.comment.delete({ where: { id: req.params.id } });
+    if (comment._count.replies > 0) {
+      await prisma.comment.update({ where: { id: req.params.id }, data: { isHidden: true, content: '[deleted]' } });
+    } else {
+      await prisma.comment.delete({ where: { id: req.params.id } });
+    }
     res.json({ message: 'Deleted' });
   } catch (err) {
     next(err);

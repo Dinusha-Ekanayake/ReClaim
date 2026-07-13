@@ -3,18 +3,21 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { Send, ArrowLeft, Circle } from 'lucide-react';
+import { Send, ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import api from '@/lib/api';
 import { useAuthStore, useIsLoggedIn } from '@/lib/store/authStore';
 import { useSocket } from '@/components/providers/SocketProvider';
 import { cn, timeAgo, getAvatarFallback } from '@/lib/utils';
+import { toast } from '@/components/ui/toaster';
 
 export default function ChatPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id?: string[] }>();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const router = useRouter();
   const user = useAuthStore(s => s.user);
   const isLoggedIn = useIsLoggedIn();
+  const isInitialized = useAuthStore(s => s.isInitialized);
   const { socket } = useSocket();
 
   const [chat, setChat] = useState<any>(null);
@@ -25,46 +28,63 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimer = useRef<NodeJS.Timeout>();
+  const lastTypingSent = useRef(0);
 
   useEffect(() => {
-    if (!isLoggedIn) router.push('/auth/login');
-  }, [isLoggedIn]);
+    if (isInitialized && !isLoggedIn) router.replace('/auth/login');
+  }, [isInitialized, isLoggedIn, router]);
 
   // Load all chats for sidebar
   useEffect(() => {
-    api.get('/chats').then(setChats).catch(() => {});
-  }, []);
+    if (!isLoggedIn) return;
+    api.get('/chats').then(setChats).catch((error) => {
+      toast({ title: 'Could not load conversations', description: error.message, variant: 'destructive' });
+    });
+  }, [isLoggedIn]);
 
   // Load specific chat
   useEffect(() => {
-    if (!id || id === 'index') return;
+    if (!isLoggedIn || !id) return;
     setLoading(true);
     api.get(`/chats/${id}`).then(data => {
       setChat(data.chat);
       setMessages(data.messages);
+    }).catch((error) => {
+      toast({ title: 'Conversation unavailable', description: error.message, variant: 'destructive' });
+      router.replace('/chat');
     }).finally(() => setLoading(false));
-  }, [id]);
+  }, [id, isLoggedIn, router]);
 
   // Socket events
   useEffect(() => {
-    if (!socket || !id || id === 'index') return;
+    if (!socket || !id) return;
     socket.emit('chat:join', id);
+    socket.emit('chat:read', { chatId: id });
 
-    socket.on('chat:message', (msg: any) => {
-      setMessages(prev => [...prev, msg]);
-    });
-    socket.on('chat:typing', (data: any) => {
+    const onMessage = (msg: any) => {
+      if (msg.chatId !== id) return;
+      setMessages(prev => prev.some(item => item.id === msg.id) ? prev : [...prev, msg]);
+      socket.emit('chat:read', { chatId: id });
+    };
+    const onTyping = (data: any) => {
       if (data.userId !== user?.id) {
         setIsTyping(true);
         clearTimeout(typingTimer.current);
         typingTimer.current = setTimeout(() => setIsTyping(false), 2000);
       }
-    });
+    };
+    const onError = (data: { message?: string }) => {
+      toast({ title: 'Message not sent', description: data.message || 'Please try again.', variant: 'destructive' });
+    };
+    socket.on('chat:message', onMessage);
+    socket.on('chat:typing', onTyping);
+    socket.on('chat:error', onError);
 
     return () => {
       socket.emit('chat:leave', id);
-      socket.off('chat:message');
-      socket.off('chat:typing');
+      socket.off('chat:message', onMessage);
+      socket.off('chat:typing', onTyping);
+      socket.off('chat:error', onError);
     };
   }, [socket, id]);
 
@@ -79,6 +99,9 @@ export default function ChatPage() {
   };
 
   const handleTyping = () => {
+    const now = Date.now();
+    if (now - lastTypingSent.current < 800) return;
+    lastTypingSent.current = now;
     socket?.emit('chat:typing', { chatId: id });
   };
 
@@ -86,7 +109,7 @@ export default function ChatPage() {
     return chat.participants?.find((p: any) => p.userId !== user?.id)?.user;
   };
 
-  if (!isLoggedIn) return null;
+  if (!isInitialized || !isLoggedIn) return null;
 
   const otherUser = chat ? getOtherParticipant(chat) : null;
 
@@ -96,7 +119,7 @@ export default function ChatPage() {
       <div className="pt-16 max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-0 sm:py-6">
         <div className="flex gap-0 sm:gap-6 h-[calc(100dvh-64px)] sm:h-[calc(100vh-120px)]">
           {/* Sidebar - Chat List */}
-          <div className={cn('w-full lg:w-80 flex-shrink-0 card rounded-none sm:rounded-2xl flex flex-col', id !== 'index' && 'hidden lg:flex')}>
+          <div className={cn('w-full lg:w-80 flex-shrink-0 card rounded-none sm:rounded-2xl flex flex-col', id && 'hidden lg:flex')}>
             <div className="p-4 border-b border-gray-100 dark:border-gray-800">
               <h2 className="font-display font-bold text-gray-900 dark:text-white">Messages</h2>
             </div>
@@ -146,7 +169,7 @@ export default function ChatPage() {
           </div>
 
           {/* Main Chat Area */}
-          {!id || id === 'index' ? (
+          {!id ? (
             <div className="hidden lg:flex flex-1 card items-center justify-center">
               <div className="text-center">
                 <div className="text-5xl mb-4 animate-float">💬</div>
@@ -216,8 +239,11 @@ export default function ChatPage() {
                   <input type="text" value={text} onChange={e => { setText(e.target.value); handleTyping(); }}
                     onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
                     placeholder="Type a message…"
+                    maxLength={2000}
+                    aria-label="Message"
                     className="input-field flex-1" />
                   <button onClick={handleSend} disabled={!text.trim()}
+                    aria-label="Send message"
                     className="btn-primary px-4 disabled:opacity-40">
                     <Send size={18} />
                   </button>

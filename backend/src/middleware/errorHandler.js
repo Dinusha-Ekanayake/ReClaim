@@ -16,6 +16,9 @@ const errorHandler = (err, req, res, next) => {
   if (err.code === 'LIMIT_FILE_COUNT') {
     return res.status(400).json({ error: 'Too many files. Max 5 images.' });
   }
+  if (['LIMIT_UNEXPECTED_FILE', 'LIMIT_FIELD_COUNT', 'LIMIT_PART_COUNT', 'LIMIT_FIELD_KEY'].includes(err.code)) {
+    return res.status(400).json({ error: 'Invalid upload request' });
+  }
 
   // JWT errors
   if (err.name === 'JsonWebTokenError') {

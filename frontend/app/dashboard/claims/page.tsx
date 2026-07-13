@@ -5,9 +5,10 @@ import Image from 'next/image';
 import { CheckCircle, XCircle, Clock, Eye, MessageSquare } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/authStore';
 import api from '@/lib/api';
-import { cn, timeAgo, formatDate } from '@/lib/utils';
+import { cn, timeAgo } from '@/lib/utils';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { SkeletonList } from '@/components/shared/LoadingSpinner';
+import { toast } from '@/components/ui/toaster';
 
 const STATUS_STYLES: Record<string, string> = {
   PENDING:  'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400',
@@ -36,22 +37,12 @@ export default function ClaimsPage() {
     setLoading(true);
     Promise.all([
       api.get('/claims/my'),
-      // Fetch claims for all user's found items via admin-style route or per-item
-      // For simplicity we piggyback on the user items list first
-      api.get(`/users/${user?.id}/items`, { type: 'FOUND', limit: 50 })
-        .then(async (data: any) => {
-          const all: any[] = [];
-          for (const item of data.items) {
-            try {
-              const c = await api.get(`/claims/item/${item.id}`);
-              all.push(...c.map((cl: any) => ({ ...cl, item })));
-            } catch {}
-          }
-          return all;
-        }),
-    ]).then(([submitted, received]) => {
+      api.get('/claims/received', { limit: 50 }),
+    ]).then(([submitted, received]: any[]) => {
       setMyClaims(submitted);
-      setReceivedClaims(received);
+      setReceivedClaims(received.claims);
+    }).catch((error) => {
+      toast({ title: 'Could not load claims', description: error.message, variant: 'destructive' });
     }).finally(() => setLoading(false));
   }, [user?.id]);
 
@@ -62,6 +53,8 @@ export default function ClaimsPage() {
       setReceivedClaims(prev =>
         prev.map(c => c.id === claimId ? { ...c, status } : c)
       );
+    } catch (error: any) {
+      toast({ title: 'Could not review claim', description: error.message, variant: 'destructive' });
     } finally {
       setProcessing(null);
     }
@@ -134,6 +127,14 @@ export default function ClaimsPage() {
                 </div>
 
                 {/* Verification answers */}
+                {claim.item?.verificationHints?.length > 0 && (
+                  <div className="mb-4 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 p-3">
+                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-2">Your private verification checklist</p>
+                    <ul className="space-y-1 text-sm text-amber-900/80 dark:text-amber-200/80 list-disc pl-4">
+                      {claim.item.verificationHints.map((hint: string) => <li key={hint}>{hint}</li>)}
+                    </ul>
+                  </div>
+                )}
                 {claim.verificationAnswers && Object.keys(claim.verificationAnswers).length > 0 && (
                   <div className="mb-4">
                     <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">Verification Answers</p>

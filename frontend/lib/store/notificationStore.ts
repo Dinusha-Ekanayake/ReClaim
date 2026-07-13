@@ -18,10 +18,10 @@ interface NotificationState {
   fetch: () => Promise<void>;
   markRead: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
-  addNew: (n: Omit<Notification, 'id' | 'isRead' | 'createdAt'>) => void;
+  addNew: (n: Notification) => void;
 }
 
-export const useNotificationStore = create<NotificationState>((set, get) => ({
+export const useNotificationStore = create<NotificationState>((set) => ({
   notifications: [],
   unreadCount: 0,
   isLoading: false,
@@ -37,6 +37,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   markRead: async (id) => {
+    const current = useNotificationStore.getState().notifications.find(n => n.id === id);
+    if (!current || current.isRead) return;
     await api.patch(`/notifications/${id}/read`);
     set(s => ({
       notifications: s.notifications.map(n => n.id === id ? { ...n, isRead: true } : n),
@@ -53,9 +55,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   addNew: (n) => {
-    const notification: Notification = {
-      ...n, id: crypto.randomUUID(), isRead: false, createdAt: new Date().toISOString(),
-    };
-    set(s => ({ notifications: [notification, ...s.notifications], unreadCount: s.unreadCount + 1 }));
+    set(s => ({ notifications: [n, ...s.notifications.filter(item => item.id !== n.id)], unreadCount: s.unreadCount + 1 }));
   },
 }));

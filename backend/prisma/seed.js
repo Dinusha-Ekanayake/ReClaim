@@ -5,17 +5,20 @@ require('dotenv').config();
 const prisma = new PrismaClient();
 
 async function main() {
+  if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 12) {
+    throw new Error('ADMIN_PASSWORD must be set to a unique value with at least 12 characters');
+  }
+
   console.log('🌱 Seeding database...');
 
   // Create Super Admin
-  const hashedPassword = await bcrypt.hash(
-    process.env.ADMIN_PASSWORD || 'Admin@123',
-    12
-  );
+  const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 12);
 
   const admin = await prisma.user.upsert({
     where: { email: process.env.ADMIN_EMAIL || 'admin@reclaim.app' },
-    update: {},
+    // An explicit seed run is also the supported way to rotate an existing
+    // bootstrap administrator away from an old or compromised password.
+    update: { password: hashedPassword },
     create: {
       email: process.env.ADMIN_EMAIL || 'admin@reclaim.app',
       password: hashedPassword,

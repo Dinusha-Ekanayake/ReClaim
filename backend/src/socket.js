@@ -1,7 +1,13 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const prisma = require('./lib/prisma');
+const { createNotification } = require('./services/notificationService');
 let io;
+
+function accessTokenFromCookie(header) {
+  const cookie = header?.split(';').map((part) => part.trim()).find((part) => part.startsWith('reclaim_access='));
+  return cookie ? decodeURIComponent(cookie.slice('reclaim_access='.length)) : null;
+}
 
 function initSocket(server) {
   const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
@@ -10,19 +16,25 @@ function initSocket(server) {
     .filter(Boolean);
 
   io = new Server(server, {
+    maxHttpBufferSize: 1e6,
+    perMessageDeflate: false,
     cors: {
       origin: allowedOrigins,
       credentials: true,
+    },
+    allowRequest(req, callback) {
+      const origin = req.headers.origin;
+      callback(null, !origin || allowedOrigins.includes(origin));
     },
   });
 
   // ─── Auth Middleware ──────────────────────────────────────────────────────
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth?.token;
+      const token = socket.handshake.auth?.token || accessTokenFromCookie(socket.handshake.headers.cookie);
       if (!token) return next(new Error('Authentication required'));
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
         select: { id: true, name: true, avatarUrl: true, role: true, isBanned: true },
@@ -30,6 +42,7 @@ function initSocket(server) {
 
       if (!user || user.isBanned) return next(new Error('User not found or banned'));
       socket.user = user;
+      socket.tokenExpiresAt = decoded.exp * 1000;
       next();
     } catch {
       next(new Error('Invalid token'));
@@ -39,34 +52,55 @@ function initSocket(server) {
   // ─── Connection ───────────────────────────────────────────────────────────
   io.on('connection', (socket) => {
     const userId = socket.user.id;
+    const sendTimestamps = [];
+    const authTimer = setTimeout(() => socket.disconnect(true), Math.max(0, socket.tokenExpiresAt - Date.now()));
     console.log(`🔌 User connected: ${socket.user.name} (${userId})`);
 
     // Join personal room for notifications
     socket.join(`user:${userId}`);
 
     // ─── Chat ──────────────────────────────────────────────────────────────
-    socket.on('chat:join', (chatId) => {
+    socket.on('chat:join', async (chatId) => {
+      if (typeof chatId !== 'string' || chatId.length > 64) return;
+      const participant = await prisma.chatParticipant.findUnique({
+        where: { chatId_userId: { chatId, userId } },
+        select: { id: true },
+      }).catch(() => null);
+      if (!participant) return socket.emit('chat:error', { message: 'Not a chat participant' });
       socket.join(`chat:${chatId}`);
     });
 
     socket.on('chat:leave', (chatId) => {
+      if (typeof chatId !== 'string') return;
       socket.leave(`chat:${chatId}`);
     });
 
     socket.on('chat:send', async (data) => {
       try {
+        if (!data || typeof data !== 'object') return;
         const { chatId, content } = data;
-        if (!content?.trim()) return;
+        if (typeof chatId !== 'string' || chatId.length > 64 || typeof content !== 'string') return;
+        const cleanContent = content.trim();
+        if (!cleanContent || cleanContent.length > 2000) {
+          return socket.emit('chat:error', { message: 'Messages must be between 1 and 2000 characters' });
+        }
+
+        const now = Date.now();
+        while (sendTimestamps.length && sendTimestamps[0] < now - 10_000) sendTimestamps.shift();
+        if (sendTimestamps.length >= 20) {
+          return socket.emit('chat:error', { message: 'You are sending messages too quickly' });
+        }
+        sendTimestamps.push(now);
 
         // Verify user is participant
         const participant = await prisma.chatParticipant.findUnique({
           where: { chatId_userId: { chatId, userId } },
         });
-        if (!participant) return socket.emit('error', { message: 'Not a chat participant' });
+        if (!participant) return socket.emit('chat:error', { message: 'Not a chat participant' });
 
         // Save message
         const message = await prisma.message.create({
-          data: { chatId, senderId: userId, content: content.trim() },
+          data: { chatId, senderId: userId, content: cleanContent },
           include: {
             sender: { select: { id: true, name: true, avatarUrl: true } },
           },
@@ -85,39 +119,33 @@ function initSocket(server) {
         });
 
         for (const other of others) {
-          // Create notification
-          await prisma.notification.create({
-            data: {
-              userId: other.userId,
-              type: 'NEW_MESSAGE',
-              title: 'New message',
-              body: `${socket.user.name}: ${content.slice(0, 60)}`,
-              link: `/chat/${chatId}`,
-            },
-          });
-          io.to(`user:${other.userId}`).emit('notification:new', {
-            type: 'NEW_MESSAGE',
-            title: 'New message',
-            body: `${socket.user.name}: ${content.slice(0, 60)}`,
-            link: `/chat/${chatId}`,
-          });
+          await createNotification(
+            other.userId,
+            'NEW_MESSAGE',
+            'New message',
+            `${socket.user.name}: ${cleanContent.slice(0, 60)}`,
+            `/chat/${chatId}`
+          );
         }
       } catch (err) {
         console.error('Socket chat:send error:', err);
-        socket.emit('error', { message: 'Failed to send message' });
+        socket.emit('chat:error', { message: 'Failed to send message' });
       }
     });
 
-    socket.on('chat:typing', (data) => {
-      socket.to(`chat:${data.chatId}`).emit('chat:typing', {
-        chatId: data.chatId,
-        userId,
-        name: socket.user.name,
-      });
+    socket.on('chat:typing', async (data) => {
+      const chatId = data?.chatId;
+      if (typeof chatId !== 'string' || !socket.rooms.has(`chat:${chatId}`)) return;
+      socket.to(`chat:${chatId}`).emit('chat:typing', { chatId, userId, name: socket.user.name });
     });
 
     socket.on('chat:read', async ({ chatId }) => {
       try {
+        if (typeof chatId !== 'string') return;
+        const participant = await prisma.chatParticipant.findUnique({
+          where: { chatId_userId: { chatId, userId } }, select: { id: true },
+        });
+        if (!participant) return;
         await prisma.chatParticipant.update({
           where: { chatId_userId: { chatId, userId } },
           data: { lastReadAt: new Date() },
@@ -130,6 +158,7 @@ function initSocket(server) {
     });
 
     socket.on('disconnect', () => {
+      clearTimeout(authTimer);
       console.log(`🔌 User disconnected: ${socket.user.name}`);
     });
   });

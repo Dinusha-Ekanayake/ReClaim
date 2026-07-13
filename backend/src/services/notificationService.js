@@ -10,7 +10,7 @@ async function createNotification(userId, type, title, body, link = null) {
     try {
       const { getIO } = require('../socket');
       const io = getIO();
-      io.to(`user:${userId}`).emit('notification:new', { type, title, body, link });
+      io.to(`user:${userId}`).emit('notification:new', notification);
     } catch {}
 
     return notification;

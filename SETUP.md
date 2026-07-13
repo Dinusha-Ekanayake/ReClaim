@@ -69,7 +69,7 @@ cp frontend/.env.example frontend/.env.local
 
 ```bash
 cd backend
-npx prisma migrate dev --name init
+npx prisma migrate deploy
 npx prisma generate
 ```
 
@@ -80,8 +80,8 @@ cd backend
 node prisma/seed.js
 ```
 
-This creates a default admin account: `admin@reclaim.app` / `Admin@123`  
-**Change this password immediately in production.**
+This creates the configured admin account. Set a unique `ADMIN_PASSWORD` (12+ characters) first.
+Running the seed again rotates an existing configured admin to that password.
 
 ### Start development servers
 
@@ -313,7 +313,7 @@ npx vercel --prod
 ## 9. Post-Deployment Checklist
 
 ```
-[ ] Change default admin password (admin@reclaim.app / Admin@123)
+[ ] Set and securely store a unique `ADMIN_PASSWORD` before seeding
 [ ] Set strong JWT_SECRET and JWT_REFRESH_SECRET (64+ random chars each)
 [ ] Verify database migrations ran successfully
 [ ] Test user registration and login

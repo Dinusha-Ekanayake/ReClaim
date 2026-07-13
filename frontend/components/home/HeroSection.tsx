@@ -2,10 +2,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Search, Sparkles, ShieldCheck, Zap, Users, MapPin, Clock, CheckCircle } from 'lucide-react';
+import { Search, Sparkles, ShieldCheck, Zap, LockKeyhole, MapPin, Clock, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IMAGES } from '@/lib/images';
+import ReclaimLogoCloud from './ReclaimLogoCloud';
 
 // Mock item cards shown in the right-side visual
 const PREVIEW_ITEMS = [
@@ -34,7 +36,7 @@ const MATCH_NOTIFICATION = {
 const STATS_STRIP = [
   { icon: <ShieldCheck size={13} />, text: 'Verified claims' },
   { icon: <Zap size={13} />, text: 'AI matching' },
-  { icon: <Users size={13} />, text: '1,200+ users' },
+  { icon: <LockKeyhole size={13} />, text: 'Private by design' },
 ];
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -46,14 +48,15 @@ export default function HeroSection() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const params = new URLSearchParams({ type, ...(query && { search: query }) });
+    const search = query.trim();
+    const params = new URLSearchParams({ type, ...(search && { search }) });
     router.push(`/items?${params.toString()}`);
   };
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50/40
                         dark:from-gray-950 dark:via-gray-950 dark:to-blue-950/30
-                        min-h-[520px] lg:min-h-[620px] flex items-center transition-colors duration-500">
+                        min-h-[520px] flex items-center transition-colors duration-500">
 
       {/* Background decorations */}
       <div className="absolute inset-0 pointer-events-none">
@@ -65,7 +68,7 @@ export default function HeroSection() {
           style={{ backgroundImage: 'radial-gradient(circle, #334155 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
       </div>
 
-      <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-24">
+      <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 pt-16 sm:pt-20 lg:pb-20 lg:pt-24">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
           {/* ── LEFT: Text & Search ─────────────────────────────── */}
@@ -118,9 +121,9 @@ export default function HeroSection() {
               className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg shadow-gray-200/60 dark:shadow-black/40 p-2
                          flex flex-col sm:flex-row gap-2 max-w-lg border border-gray-100 dark:border-gray-800 mb-6"
             >
-              <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1 flex-shrink-0">
+              <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1 flex-shrink-0" role="group" aria-label="Report type">
                 {(['LOST', 'FOUND'] as const).map(t => (
-                  <button key={t} type="button" onClick={() => setType(t)}
+                  <button key={t} type="button" onClick={() => setType(t)} aria-pressed={type === t}
                     className={cn('px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200',
                       type === t
                         ? t === 'LOST'
@@ -132,8 +135,9 @@ export default function HeroSection() {
                 ))}
               </div>
               <div className="flex-1 flex items-center gap-2 px-3">
-                <Search size={16} className="text-gray-400 flex-shrink-0" />
+                <Search size={16} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
                 <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+                  aria-label="Search lost and found items" maxLength={100} autoComplete="off"
                   placeholder="Search by name, category, location…"
                   className="flex-1 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none bg-transparent py-1" />
               </div>
@@ -147,19 +151,19 @@ export default function HeroSection() {
               variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } } }}
               className="flex flex-wrap items-center gap-4 mb-8"
             >
-              <a href="/items/new?type=LOST"
+              <Link href="/items/new?type=LOST"
                 className="text-sm font-semibold text-red-600 dark:text-red-400 hover:text-red-700 flex items-center gap-1.5 group transition-colors">
                 <span className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center text-xs">+</span>
                 Report lost item
                 <span className="group-hover:translate-x-0.5 transition-transform inline-block">→</span>
-              </a>
+              </Link>
               <span className="text-gray-200 dark:text-gray-700 select-none">|</span>
-              <a href="/items/new?type=FOUND"
+              <Link href="/items/new?type=FOUND"
                 className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 flex items-center gap-1.5 group transition-colors">
                 <span className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-xs">+</span>
                 Post found item
                 <span className="group-hover:translate-x-0.5 transition-transform inline-block">→</span>
-              </a>
+              </Link>
             </motion.div>
 
             <motion.div
@@ -255,7 +259,7 @@ export default function HeroSection() {
                   </div>
                   <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-50 dark:border-gray-800">
                     <CheckCircle size={11} className="text-emerald-500" />
-                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">87% confidence match</span>
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Smart confidence scoring</span>
                   </div>
                 </div>
               </motion.div>
@@ -275,8 +279,7 @@ export default function HeroSection() {
                       </div>
                     ))}
                   </div>
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">12 online now</span>
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Community powered</span>
                 </div>
               </motion.div>
             </div>
@@ -296,6 +299,8 @@ export default function HeroSection() {
             ))}
           </motion.div>
         </div>
+
+        <ReclaimLogoCloud />
       </div>
     </section>
   );

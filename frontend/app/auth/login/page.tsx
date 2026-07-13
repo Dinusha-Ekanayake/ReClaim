@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, AlertCircle, CheckCircle, Package, Search, Users } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Package } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/authStore';
 import { ApiError } from '@/lib/api';
 import { LogoIcon } from '@/components/shared/Logo';
@@ -84,13 +84,13 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Stats */}
+          {/* Trust signals */}
           <div className="grid grid-cols-3 gap-4 pt-8 border-t border-white/20">
-            {[['2.4k+', 'Items reported', <Search size={16} />], ['860+', 'Reunited', <CheckCircle size={16} />], ['1.2k+', 'Users', <Users size={16} />]].map(([v, l, icon]) => (
-              <div key={String(l)} className="text-center">
-                <div className="flex justify-center mb-1 text-blue-300">{icon as React.ReactNode}</div>
-                <div className="text-2xl font-display font-extrabold">{String(v)}</div>
-                <div className="text-xs text-blue-300 font-medium">{String(l)}</div>
+            {[['Community-led', 'Local connections', '◎'], ['Safer returns', 'Private checks', '✓'], ['Always open', 'Browse for free', '∞']].map(([v, l, icon]) => (
+              <div key={String(v)} className="text-center">
+                <div className="flex justify-center mb-1.5 text-blue-300 text-base font-bold">{icon}</div>
+                <div className="text-sm font-display font-bold">{String(v)}</div>
+                <div className="text-[11px] text-blue-300 font-medium mt-1">{String(l)}</div>
               </div>
             ))}
           </div>
@@ -137,10 +137,10 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Password</label>
-                <Link href="/auth/forgot-password"
+                <a href="mailto:support@reclaim.app?subject=Password%20reset"
                   className="text-xs text-primary-600 hover:text-primary-700 font-medium">
                   Forgot password?
-                </Link>
+                </a>
               </div>
               <div className="relative">
                 <input type={showPw ? 'text' : 'password'} value={password}

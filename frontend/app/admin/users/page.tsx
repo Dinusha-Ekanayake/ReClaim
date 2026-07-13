@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { Search, Ban, CheckCircle, Shield, ChevronDown } from 'lucide-react';
+import { Search, Ban, CheckCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { cn, timeAgo, getAvatarFallback } from '@/lib/utils';
 

@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
+const { getPagination, paginationResult } = require('../utils/query');
 
 // GET /api/notifications
 router.get('/', authenticate, async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, unread } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { unread } = req.query;
+    const pagination = getPagination(req.query, { defaultLimit: 20, maxLimit: 100 });
 
     const where = {
       userId: req.user.id,
@@ -18,14 +19,14 @@ router.get('/', authenticate, async (req, res, next) => {
       prisma.notification.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip,
-        take: Number(limit),
+        skip: pagination.skip,
+        take: pagination.limit,
       }),
       prisma.notification.count({ where }),
       prisma.notification.count({ where: { userId: req.user.id, isRead: false } }),
     ]);
 
-    res.json({ notifications, total, unreadCount, page: Number(page) });
+    res.json({ notifications, unreadCount, ...paginationResult(total, pagination.page, pagination.limit) });
   } catch (err) {
     next(err);
   }
@@ -34,7 +35,7 @@ router.get('/', authenticate, async (req, res, next) => {
 // PATCH /api/notifications/read-all
 router.patch('/read-all', authenticate, async (req, res, next) => {
   try {
-    await prisma.notification.updateMany({
+    const result = await prisma.notification.updateMany({
       where: { userId: req.user.id, isRead: false },
       data: { isRead: true },
     });
@@ -51,6 +52,7 @@ router.patch('/:id/read', authenticate, async (req, res, next) => {
       where: { id: req.params.id, userId: req.user.id },
       data: { isRead: true },
     });
+    if (!result.count) return res.status(404).json({ error: 'Notification not found' });
     res.json({ message: 'Notification marked as read' });
   } catch (err) {
     next(err);

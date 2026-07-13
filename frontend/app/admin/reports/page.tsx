@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { ExternalLink, CheckCircle, XCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { cn, timeAgo } from '@/lib/utils';
 

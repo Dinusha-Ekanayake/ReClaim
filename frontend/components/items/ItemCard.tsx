@@ -15,9 +15,10 @@ interface ItemCardProps {
   item: any;
   showStatus?: boolean;
   className?: string;
+  variant?: 'grid' | 'list';
 }
 
-export default function ItemCard({ item, showStatus = false, className }: ItemCardProps) {
+export default function ItemCard({ item, showStatus = false, className, variant = 'grid' }: ItemCardProps) {
   const primaryImage = item.images?.[0]?.url;
   const isLost = item.type === 'LOST';
   const catEmoji = CATEGORY_EMOJI[item.category] ?? '📦';
@@ -28,11 +29,12 @@ export default function ItemCard({ item, showStatus = false, className }: ItemCa
         'group block bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden',
         'shadow-sm hover:shadow-xl dark:shadow-black/20 dark:hover:shadow-black/40 hover:-translate-y-1.5',
         'transition-all duration-300',
+        variant === 'list' && 'sm:flex sm:min-h-52 hover:-translate-y-0 hover:-translate-x-1',
         className
       )}>
 
       {/* ── Image area ─────────────────────────────────────────── */}
-      <div className="relative h-48 overflow-hidden bg-gray-50 dark:bg-gray-800">
+      <div className={cn('relative h-48 overflow-hidden bg-gray-50 dark:bg-gray-800', variant === 'list' && 'sm:h-auto sm:w-64 sm:flex-shrink-0')}>
         {primaryImage ? (
           <Image
             src={primaryImage}
@@ -85,7 +87,7 @@ export default function ItemCard({ item, showStatus = false, className }: ItemCa
       </div>
 
       {/* ── Content ────────────────────────────────────────────── */}
-      <div className="p-4">
+      <div className={cn('p-4', variant === 'list' && 'sm:flex-1 sm:p-6')}>
         {/* Title + category */}
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <h3 className="font-display font-semibold text-gray-900 dark:text-white text-sm leading-snug

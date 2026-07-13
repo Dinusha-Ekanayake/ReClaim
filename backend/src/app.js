@@ -34,8 +34,17 @@ function createApp() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   }));
 
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  // Cookie-authenticated mutations must never be accepted from a cross-site browser.
+  app.use((req, res, next) => {
+    const safeMethod = ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+    if (!safeMethod && req.headers['sec-fetch-site'] === 'cross-site' && !allowedOrigins.includes(req.headers.origin)) {
+      return res.status(403).json({ error: 'Cross-site request rejected' });
+    }
+    next();
+  });
+
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: false, limit: '100kb', parameterLimit: 100 }));
 
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
@@ -49,7 +58,7 @@ function createApp() {
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' },
   });
-  const authLimiter = rateLimit({
+  const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 20,
     standardHeaders: true,
@@ -57,10 +66,18 @@ function createApp() {
     skipSuccessfulRequests: true, // don't penalize successful logins
     message: { error: 'Too many auth attempts, please try again later.' },
   });
+  const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many accounts created from this address. Please try again later.' },
+  });
 
   app.use('/api/', limiter);
-  app.use('/api/auth/login', authLimiter);
-  app.use('/api/auth/register', authLimiter);
+  app.use('/api/auth/login', loginLimiter);
+  app.use('/api/auth/register', registerLimiter);
+  app.use('/api/auth/refresh', loginLimiter);
 
   // ─── Health Check ───────────────────────────────────────────────────────────
   app.get('/api/health', (req, res) => {

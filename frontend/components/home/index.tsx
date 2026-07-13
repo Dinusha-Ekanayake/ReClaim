@@ -1,13 +1,10 @@
 'use client';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
 import { ArrowRight, Search, MessageSquare, CheckCircle, Shield, Zap, Users, TrendingUp } from 'lucide-react';
 import api from '@/lib/api';
 import ItemCard from '@/components/items/ItemCard';
 import { Reveal } from '@/components/shared/motion';
-import { IMAGES } from '@/lib/images';
 import { CATEGORIES } from '@/lib/utils';
 
 // ─── Animated counter hook ────────────────────────────────────────────────────

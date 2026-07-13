@@ -29,6 +29,7 @@ function SearchPageContent() {
   const debouncedQuery = useDebounce(query, 400);
 
   useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
     const params: Record<string, any> = { page, limit: 12, order: 'desc' };
     if (debouncedQuery) params.search = debouncedQuery;
@@ -36,10 +37,11 @@ function SearchPageContent() {
     if (category) params.category = category;
     if (color) params.color = color;
 
-    api.get('/items', params)
+    api.get('/items', params, { signal: controller.signal })
       .then(data => { setItems(data.items); setPagination(data.pagination); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch((error) => { if (error.name !== 'AbortError') setItems([]); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [debouncedQuery, type, category, color, page]);
 
   const clearAll = () => {

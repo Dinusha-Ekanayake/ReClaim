@@ -1,7 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Check, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck } from 'lucide-react';
 import { useNotificationStore } from '@/lib/store/notificationStore';
 import { cn, timeAgo } from '@/lib/utils';
 

@@ -10,9 +10,9 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    # prisma generate (not migrate) — the schema is already applied on Supabase,
-    # and migration history isn't committed. Run migrations manually if needed.
-    buildCommand: npm install && npx prisma generate
+    # Generate the client and apply committed, forward-only migrations before
+    # the new application version starts serving requests.
+    buildCommand: npm ci && npx prisma generate && npx prisma migrate deploy
     startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true

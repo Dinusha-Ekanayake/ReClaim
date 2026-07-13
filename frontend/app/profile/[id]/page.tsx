@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { MapPin, Calendar, Package, ArrowLeft } from 'lucide-react';
 import PublicLayout from '@/components/layout/PublicLayout';

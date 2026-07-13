@@ -5,7 +5,7 @@
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                        CLIENT (Browser)                          │
-│  Next.js 14  ·  Tailwind CSS  ·  Zustand  ·  Socket.io-client  │
+│  Next.js 16  ·  Tailwind CSS  ·  Zustand  ·  Socket.io-client  │
 └────────────────────────────┬─────────────────────────────────────┘
                              │ HTTPS / WSS
 ┌────────────────────────────▼─────────────────────────────────────┐
@@ -101,14 +101,14 @@ Thresholds:
 
 ```
 Register/Login → JWT access token (15min) + refresh token (7d)
-                 stored in localStorage
+                 HttpOnly cookies; refresh-token digest stored in PostgreSQL
 
-Every API request → Authorization: Bearer <accessToken>
+Every web request → credentialed cookie auth (Bearer tokens remain supported for API clients)
 
-On 401 TOKEN_EXPIRED → auto-refresh using refreshToken
+On 401 TOKEN_EXPIRED → credentialed auto-refresh using the HttpOnly cookie
                         rotate refresh token (single-use)
 
-Logout → delete refreshToken from DB + clear localStorage
+Logout → delete refresh-token digest from DB + clear HttpOnly cookies/in-memory access token
 ```
 
 ## Real-time Chat

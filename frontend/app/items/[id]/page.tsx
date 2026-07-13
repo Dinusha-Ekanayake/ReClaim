@@ -5,8 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
-  MapPin, Calendar, Tag, Palette, Package, User, MessageSquare,
-  Flag, ArrowLeft, CheckCircle, Shield, Phone, ExternalLink, Star
+  MapPin, Calendar, Tag, Palette, Package, MessageSquare,
+  Flag, ArrowLeft, CheckCircle, Shield, Phone, Star
 } from 'lucide-react';
 import PublicLayout from '@/components/layout/PublicLayout';
 import CommentSection from '@/components/items/CommentSection';
@@ -15,13 +15,15 @@ import ClaimModal from '@/components/items/ClaimModal';
 import MapView from '@/components/items/MapView';
 import api from '@/lib/api';
 import { useAuthStore, useIsLoggedIn } from '@/lib/store/authStore';
-import { cn, timeAgo, formatDate, getStatusColor, getStatusLabel, CATEGORIES } from '@/lib/utils';
+import { cn, formatDate, getStatusColor, getStatusLabel, CATEGORIES } from '@/lib/utils';
+import { toast } from '@/components/ui/toaster';
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const user = useAuthStore(s => s.user);
   const isLoggedIn = useIsLoggedIn();
+  const isInitialized = useAuthStore(s => s.isInitialized);
 
   const [item, setItem] = useState<any>(null);
   const [matches, setMatches] = useState<any[]>([]);
@@ -31,11 +33,12 @@ export default function ItemDetailPage() {
   const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
+    if (!isInitialized) return;
     api.get(`/items/${id}`).then(data => {
       setItem(data);
       setLoading(false);
     }).catch(() => router.push('/items'));
-  }, [id]);
+  }, [id, isInitialized, router]);
 
   useEffect(() => {
     if (item && user && item.userId === user.id) {
@@ -48,21 +51,29 @@ export default function ItemDetailPage() {
     try {
       const chat = await api.post('/chats', { recipientId: item.userId, itemId: item.id });
       router.push(`/chat/${chat.id}`);
-    } catch {}
+    } catch (error: any) {
+      toast({ title: 'Could not start chat', description: error.message, variant: 'destructive' });
+    }
   };
 
   const handleStatusUpdate = async (status: string) => {
     try {
       await api.patch(`/items/${id}/status`, { status });
       setItem((prev: any) => ({ ...prev, status }));
-    } catch {}
+      toast({ title: 'Status updated', description: `This item is now ${getStatusLabel(status).toLowerCase()}.` });
+    } catch (error: any) {
+      toast({ title: 'Could not update status', description: error.message, variant: 'destructive' });
+    }
   };
 
   const handleReport = async (reason: string) => {
     try {
       await api.post('/reports', { itemId: id, reason });
       setReportOpen(false);
-    } catch {}
+      toast({ title: 'Report submitted', description: 'Thank you. A moderator will review this item.' });
+    } catch (error: any) {
+      toast({ title: 'Could not submit report', description: error.message, variant: 'destructive' });
+    }
   };
 
   if (loading) {
@@ -310,9 +321,10 @@ export default function ItemDetailPage() {
       {reportOpen && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <motion.div
+            role="dialog" aria-modal="true" aria-labelledby="report-dialog-title"
             initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl border border-transparent dark:border-gray-800">
-            <h3 className="font-display font-bold text-gray-900 dark:text-white mb-4">Report Item</h3>
+            <h3 id="report-dialog-title" className="font-display font-bold text-gray-900 dark:text-white mb-4">Report Item</h3>
             <div className="space-y-2">
               {['FAKE', 'INAPPROPRIATE', 'SPAM', 'WRONG_CATEGORY', 'OTHER'].map(reason => (
                 <button key={reason} onClick={() => handleReport(reason)}

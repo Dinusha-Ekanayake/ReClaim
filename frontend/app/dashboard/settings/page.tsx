@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Image from 'next/image';
-import { Camera, Save, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { Camera, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/authStore';
 import api, { ApiError } from '@/lib/api';
 import { getAvatarFallback } from '@/lib/utils';

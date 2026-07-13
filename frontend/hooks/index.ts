@@ -27,7 +27,9 @@ interface UseItemsOptions {
 }
 
 export function useItems(options: UseItemsOptions = {}) {
-  const { enabled = true, ...params } = options;
+  const {
+    enabled = true, type, category, search, status, color, brand, sort, page, limit,
+  } = options;
   const [items, setItems] = useState<Item[]>([]);
   const [pagination, setPagination] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -39,7 +41,7 @@ export function useItems(options: UseItemsOptions = {}) {
     setError(null);
     try {
       const data: PaginatedResponse<Item> = await api.get('/items', {
-        ...params,
+        type, category, search, status, color, brand, sort, page, limit,
         order: 'desc',
       } as any);
       setItems(data.items);
@@ -49,7 +51,7 @@ export function useItems(options: UseItemsOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [JSON.stringify(params), enabled]);
+  }, [enabled, type, category, search, status, color, brand, sort, page, limit]);
 
   useEffect(() => { fetch(); }, [fetch]);
 

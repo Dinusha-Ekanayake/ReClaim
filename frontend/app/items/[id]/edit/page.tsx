@@ -11,6 +11,7 @@ export default function EditItemPage() {
   const { id } = useParams<{ id: string }>();
   const router  = useRouter();
   const user    = useAuthStore(s => s.user);
+  const isInitialized = useAuthStore(s => s.isInitialized);
 
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(false);
@@ -24,6 +25,8 @@ export default function EditItemPage() {
   });
 
   useEffect(() => {
+    if (!isInitialized) return;
+    if (!user) { router.replace('/auth/login'); return; }
     api.get(`/items/${id}`).then(item => {
       if (item.userId !== user?.id) { router.push('/dashboard/items'); return; }
       setForm({
@@ -41,7 +44,7 @@ export default function EditItemPage() {
       });
     }).catch(() => router.push('/dashboard/items'))
       .finally(() => setLoading(false));
-  }, [id, user?.id]);
+  }, [id, user?.id, isInitialized, router]);
 
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 

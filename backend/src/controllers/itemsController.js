@@ -2,6 +2,8 @@ const prisma = require('../lib/prisma');
 const { computeMatches } = require('../services/matchingService');
 const { generateEmbedding } = require('../services/embeddingService');
 const { createNotification } = require('../services/notificationService');
+const { getPagination, paginationResult } = require('../utils/query');
+const { publicItemSelect, publicUserSelect, primaryImageSelect } = require('../utils/selects');
 
 const ITEMS_PER_PAGE = 12;
 
@@ -17,7 +19,6 @@ exports.list = async (req, res, next) => {
     const {
       type, category, status = 'ACTIVE', search,
       page = 1, limit = ITEMS_PER_PAGE,
-      lat, lng, radius, // km
       dateFrom, dateTo, color, brand,
       sort = 'createdAt', order = 'desc',
     } = req.query;
@@ -45,34 +46,27 @@ exports.list = async (req, res, next) => {
       } : {}),
     };
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const pagination = getPagination({ page, limit }, { defaultLimit: ITEMS_PER_PAGE, maxLimit: 50 });
 
     const [items, total] = await Promise.all([
       prisma.item.findMany({
         where,
-        skip,
-        take: Number(limit),
+        skip: pagination.skip,
+        take: pagination.limit,
         orderBy: { [sort]: order },
-        include: {
-          images: { where: { isPrimary: true }, take: 1 },
-          user: { select: { id: true, name: true, avatarUrl: true } },
-          _count: { select: { comments: true, claims: true } },
+        select: {
+          ...publicItemSelect,
+          images: primaryImageSelect,
+          user: { select: publicUserSelect },
+          _count: { select: { comments: { where: { isHidden: false } } } },
         },
       }),
       prisma.item.count({ where }),
     ]);
 
-    // Remove verification hints from public response
-    const safeItems = items.map(({ verificationHints, embedding, ...item }) => item);
-
     res.json({
-      items: safeItems,
-      pagination: {
-        total,
-        page: Number(page),
-        limit: Number(limit),
-        pages: Math.ceil(total / Number(limit)),
-      },
+      items,
+      pagination: paginationResult(total, pagination.page, pagination.limit),
     });
   } catch (err) {
     next(err);
@@ -101,7 +95,8 @@ exports.getOne = async (req, res, next) => {
     });
 
     if (!item) return res.status(404).json({ error: 'Item not found' });
-    if (!item.isApproved && item.userId !== userId && !['ADMIN', 'SUPER_ADMIN'].includes(req.user?.role)) {
+    const isPrivileged = item.userId === userId || ['ADMIN', 'SUPER_ADMIN'].includes(req.user?.role);
+    if ((!item.isApproved || item.status === 'REJECTED') && !isPrivileged) {
       return res.status(404).json({ error: 'Item not found' });
     }
 
@@ -112,7 +107,7 @@ exports.getOne = async (req, res, next) => {
     const { verificationHints, embedding, ...safeItem } = item;
 
     // Only show phone if user allowed it
-    if (!item.user.showPhone) {
+    if (!isPrivileged && (!item.user.showPhone || !item.showContactInfo)) {
       safeItem.user = { ...safeItem.user, phone: null };
     }
 
@@ -135,12 +130,6 @@ exports.create = async (req, res, next) => {
       showContactInfo = false, imageUrls = [], imagePublicIds = [],
     } = req.body;
 
-    // Generate AI embedding (optional, won't fail if unavailable)
-    let embedding = null;
-    try {
-      embedding = await generateEmbedding(`${title} ${description} ${category} ${brand || ''} ${color || ''}`);
-    } catch {}
-
     const item = await prisma.item.create({
       data: {
         type,
@@ -152,18 +141,17 @@ exports.create = async (req, res, next) => {
         color,
         size,
         locationLabel,
-        locationLat: locationLat ? parseFloat(locationLat) : null,
-        locationLng: locationLng ? parseFloat(locationLng) : null,
+        locationLat: locationLat !== undefined && locationLat !== null ? Number(locationLat) : null,
+        locationLng: locationLng !== undefined && locationLng !== null ? Number(locationLng) : null,
         locationArea,
         dateLostFound: new Date(dateLostFound),
         userId: req.user.id,
-        verificationHints,
+        verificationHints: type === 'FOUND' ? verificationHints : [],
         showContactInfo,
-        embedding,
         images: {
           create: imageUrls.map((url, i) => ({
             url,
-            publicId: imagePublicIds[i] || '',
+            publicId: imagePublicIds[i],
             isPrimary: i === 0,
           })),
         },
@@ -174,10 +162,14 @@ exports.create = async (req, res, next) => {
       },
     });
 
-    // Async: compute matches (don't await to keep response fast)
-    computeMatches(item.id).catch(console.error);
+    // Enrichment and matching run outside the request's critical path.
+    generateEmbedding(`${title} ${description} ${category} ${brand || ''} ${color || ''}`)
+      .then((embedding) => prisma.item.update({ where: { id: item.id }, data: { embedding } }))
+      .then(() => computeMatches(item.id))
+      .catch((err) => console.error('Failed to compute item matches:', err.message));
 
-    res.status(201).json(item);
+    const { embedding: ignoredEmbedding, ...safeItem } = item;
+    res.status(201).json(safeItem);
   } catch (err) {
     next(err);
   }
@@ -193,7 +185,6 @@ exports.update = async (req, res, next) => {
     if (item.userId !== req.user.id && !['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-
     const {
       title, description, category, subcategory, brand, color, size,
       locationLabel, locationLat, locationLng, locationArea,
@@ -211,17 +202,27 @@ exports.update = async (req, res, next) => {
         color,
         size,
         ...(locationLabel && { locationLabel }),
-        ...(locationLat !== undefined && { locationLat: parseFloat(locationLat) }),
-        ...(locationLng !== undefined && { locationLng: parseFloat(locationLng) }),
+        ...(locationLat !== undefined && { locationLat: locationLat === null ? null : Number(locationLat) }),
+        ...(locationLng !== undefined && { locationLng: locationLng === null ? null : Number(locationLng) }),
         locationArea,
         ...(dateLostFound && { dateLostFound: new Date(dateLostFound) }),
-        ...(verificationHints && { verificationHints }),
+        ...(verificationHints !== undefined && { verificationHints: item.type === 'FOUND' ? verificationHints : [] }),
         ...(showContactInfo !== undefined && { showContactInfo }),
       },
       include: { images: true, user: { select: { id: true, name: true, avatarUrl: true } } },
     });
 
-    res.json(updated);
+    const matchingFieldsChanged = [title, description, category, brand, color, locationLat, locationLng, locationLabel, dateLostFound]
+      .some((value) => value !== undefined);
+    if (matchingFieldsChanged) {
+      generateEmbedding(`${updated.title} ${updated.description} ${updated.category} ${updated.brand || ''} ${updated.color || ''}`)
+        .then((embedding) => prisma.item.update({ where: { id }, data: { embedding } }))
+        .then(() => computeMatches(id))
+        .catch((err) => console.error('Failed to refresh item matching:', err.message));
+    }
+
+    const { embedding: ignoredEmbedding, ...safeUpdated } = updated;
+    res.json(safeUpdated);
   } catch (err) {
     next(err);
   }
@@ -231,7 +232,7 @@ exports.update = async (req, res, next) => {
 exports.remove = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const item = await prisma.item.findUnique({ where: { id } });
+    const item = await prisma.item.findUnique({ where: { id }, include: { images: { select: { publicId: true } } } });
 
     if (!item) return res.status(404).json({ error: 'Item not found' });
     if (item.userId !== req.user.id && !['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
@@ -239,6 +240,8 @@ exports.remove = async (req, res, next) => {
     }
 
     await prisma.item.delete({ where: { id } });
+    const { deleteFromCloudinary } = require('../services/cloudinaryService');
+    await Promise.all(item.images.filter((image) => image.publicId).map((image) => deleteFromCloudinary(image.publicId)));
     res.json({ message: 'Item deleted' });
   } catch (err) {
     next(err);
@@ -260,6 +263,9 @@ exports.updateStatus = async (req, res, next) => {
     if (!item) return res.status(404).json({ error: 'Item not found' });
     if (item.userId !== req.user.id && !['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
       return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(req.user.role) && !['ACTIVE', 'RETURNED', 'CLOSED'].includes(status)) {
+      return res.status(403).json({ error: 'This status can only be set by the claim and matching workflows' });
     }
 
     const updated = await prisma.item.update({
